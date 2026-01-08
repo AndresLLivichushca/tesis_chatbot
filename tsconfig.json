@@ -6,9 +6,8 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["node"],
-    "lib": ["ES2020", "DOM"] 
+    "types": ["node"],  // Asegúrate que diga "node", NO "nodo"
+    "lib": ["ES2020", "DOM"]
   }
 }
