@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-
+import { Request, Response } from 'express';
 import { manychatRouter } from './interfaces/http/routes/manychat.routes';
 import { requestIdMiddleware } from './interfaces/http/middlewares/requestId.middleware';
 
