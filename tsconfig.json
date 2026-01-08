@@ -7,7 +7,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"],  // Asegúrate que diga "node", NO "nodo"
+    "types": ["node"], 
     "lib": ["ES2020", "DOM"]
   }
 }
