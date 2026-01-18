@@ -8,7 +8,6 @@ type ManychatIncoming = {
   action: 'FACTURAS_ESTADO' | 'SERVICIO_ESTADO' | 'TICKET_CREAR';
   cedula?: string;
 
-  // ticket
   telefono?: string;
   tipoProblema?: 'SIN_SERVICIO' | 'LENTO' | 'INTERMITENTE' | 'OTRO';
   descripcion?: string;
@@ -25,46 +24,60 @@ export const manychatController = {
       const body = req.body as ManychatIncoming;
       const startedAt = Date.now();
 
-      logInfo(`Incoming ManyChat`, { requestId, body });
+      logInfo('Incoming ManyChat', { requestId, body });
 
       if (!body?.action) {
-        return res.status(400).json({ ok: false, error: 'action es requerida', requestId });
+        return res.status(400).json({
+          ok: false,
+          error: 'action es requerida',
+          requestId,
+        });
       }
 
-      // Para los 3 casos, pedimos cédula
       const cedula = String(body.cedula ?? '').trim();
       if (!cedula || !isCedulaValida(cedula)) {
-        return res.status(400).json({ ok: false, error: 'Cédula inválida (10 dígitos)', requestId });
+        return res.status(400).json({
+          ok: false,
+          error: 'Cédula inválida (10 dígitos)',
+          requestId,
+        });
       }
 
-      // Router por "action"
+      // ================= FACTURAS =================
       if (body.action === 'FACTURAS_ESTADO') {
         const data = await consultarFacturasEnMake({ cedula });
 
-        logInfo(`FACTURAS_ESTADO OK`, { requestId, ms: Date.now() - startedAt });
+        logInfo('FACTURAS_ESTADO OK', {
+          requestId,
+          ms: Date.now() - startedAt,
+        });
 
         return res.json({
           ok: true,
           requestId,
-          ...data,
+          data,
         });
       }
 
+      // ================= SERVICIO =================
       if (body.action === 'SERVICIO_ESTADO') {
         const data = await consultarEstadoServicioEnMake({ cedula });
 
-        logInfo(`SERVICIO_ESTADO OK`, { requestId, ms: Date.now() - startedAt });
+        logInfo('SERVICIO_ESTADO OK', {
+          requestId,
+          ms: Date.now() - startedAt,
+        });
 
         return res.json({
           ok: true,
           requestId,
-          ...data,
+          data,
         });
       }
 
+      // ================= TICKET =================
       if (body.action === 'TICKET_CREAR') {
-        const tipoProblema = body.tipoProblema;
-        if (!tipoProblema) {
+        if (!body.tipoProblema) {
           return res.status(400).json({
             ok: false,
             error: 'tipoProblema es requerido',
@@ -75,33 +88,39 @@ export const manychatController = {
         const data = await crearTicketEnMake({
           cedula,
           telefono: body.telefono,
-          tipoProblema,
+          tipoProblema: body.tipoProblema,
           descripcion: body.descripcion,
           ubicacion: body.ubicacion,
         });
 
-        logInfo(`TICKET_CREAR OK`, { requestId, ms: Date.now() - startedAt });
+        logInfo('TICKET_CREAR OK', {
+          requestId,
+          ms: Date.now() - startedAt,
+        });
 
         return res.json({
           ok: true,
           requestId,
-          ...data,
+          data,
         });
       }
 
-      return res.status(400).json({ ok: false, error: 'action no soportada', requestId });
+      return res.status(400).json({
+        ok: false,
+        error: 'action no soportada',
+        requestId,
+      });
 
     } catch (err: any) {
-      logError(`ManyChat handler error`, {
+      logError('ManyChat handler error', {
         requestId,
         message: err?.message,
         response: err?.response?.data,
       });
 
-      // 502: falla de dependencia externa (Make/Odoo)
       return res.status(502).json({
         ok: false,
-        error: 'No se pudo completar la operación (dependencia externa).',
+        error: 'No se pudo completar la operación (dependencia externa)',
         requestId,
       });
     }
