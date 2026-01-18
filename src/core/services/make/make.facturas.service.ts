@@ -21,13 +21,14 @@ export const consultarFacturasEnMake = async (
 ): Promise<FacturasResponse> => {
   const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  // 🔒 Protección total contra null / undefined
-  const infoFinetic = data?.livingnet?.finetic ?? null;
+  // Extraemos la info real desde el WebService
+  const infoFinetic = data?.livingnet?.finetic;
+
+  const contratos = infoFinetic?.contratos ?? [];
+  const primerContrato = contratos[0];
+  const primeraFactura = primerContrato?.facturas?.[0];
 
   const saldoTotal = Number(infoFinetic?.saldototal ?? 0);
-
-  const contrato = infoFinetic?.contratos?.[0] ?? null;
-  const factura = contrato?.facturas?.[0] ?? null;
 
   return {
     ok: true,
@@ -38,12 +39,12 @@ export const consultarFacturasEnMake = async (
 
     montoPendiente: saldoTotal,
 
-    fechaVencimiento: factura?.fechaemision ?? null,
+    fechaVencimiento: primeraFactura?.fechaemision ?? null,
 
     estadoServicio:
-      contrato?.estadocontrato === 'ejecucion'
+      primerContrato?.estadocontrato === 'ejecucion'
         ? 'ACTIVO'
-        : contrato?.estadocontrato
+        : primerContrato
         ? 'SUSPENDIDO'
         : 'DESCONOCIDO',
   };
