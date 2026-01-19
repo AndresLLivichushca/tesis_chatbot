@@ -1,6 +1,6 @@
 import { loadEnv } from '../../../config/env';
 import { makeHttp } from './make.client';
-//correcion
+
 const env = loadEnv();
 
 export type FacturasRequest = {
@@ -19,29 +19,32 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
-  // CAMBIO AQUÍ: Recibimos la respuesta completa de Make
+  // 1. Llamada a Make
   const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
-  const data = response.data; // Los datos reales que configuraste en el módulo rojo
+  const data = response.data; 
+
+  // LOG DE CONTROL: Esto te permitirá ver en Render qué está llegando exactamente
+  console.log("DEBUG - Datos recibidos de Make:", JSON.stringify(data));
 
   let infoReal;
   try {
-    // Verificamos si livingnet viene como string (Odoo v9) o ya parseado
+    // 2. Parseo de la respuesta (Odoo v9 devuelve livingnet como String)
     const livingnetParsed = typeof data?.livingnet === 'string' 
       ? JSON.parse(data.livingnet) 
       : data?.livingnet;
     
     infoReal = livingnetParsed?.finetic;
   } catch (error) {
-    console.error("Error al parsear livingnet:", error);
+    console.error("Error crítico al parsear livingnet:", error);
   }
 
-  // ... (el resto del código igual)
+  // 3. Extracción de datos financieros
   const contratos = infoReal?.contratos ?? [];
   const primerContrato = contratos[0];
   const primeraFactura = primerContrato?.facturas?.[0];
-
   const saldoTotal = Number(infoReal?.saldototal ?? 0);
 
+  // 4. Respuesta estructurada para ManyChat
   return {
     ok: true,
     nombreCliente: infoReal?.nombre ?? 'No encontrado',
