@@ -19,23 +19,38 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
-  const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
-  
-  // Con el parseJSON de Make, 'data' ya es el objeto limpio
-  const data = response.data; 
-  
-  // Acceso directo a la estructura de Odoo
-  const infoFinetic = data?.livingnet?.finetic;
-  const contrato = infoFinetic?.contratos?.[0];
+
+  const { data } = await makeHttp.post(
+    env.MAKE_FACTURAS_WEBHOOK_URL,
+    payload
+  );
+
+  const finetic = data?.livingnet?.finetic;
+
+  if (!finetic) {
+    return {
+      ok: true,
+      nombreCliente: 'No encontrado',
+      tieneDeuda: false,
+      montoPendiente: 0,
+      fechaVencimiento: null,
+      estadoServicio: 'DESCONOCIDO',
+    };
+  }
+
+  const contrato = finetic.contratos?.[0];
   const factura = contrato?.facturas?.[0];
-  const saldo = Number(infoFinetic?.saldototal ?? 0);
+  const saldo = Number(finetic.saldototal ?? 0);
 
   return {
     ok: true,
-    nombreCliente: infoFinetic?.nombre ?? 'No encontrado',
+    nombreCliente: finetic.nombre,
     tieneDeuda: saldo > 0,
     montoPendiente: saldo,
     fechaVencimiento: factura?.fechaemision ?? null,
-    estadoServicio: contrato?.estadocontrato === 'ejecucion' ? 'ACTIVO' : 'SUSPENDIDO',
+    estadoServicio:
+      contrato?.estadocontrato === 'ejecucion'
+        ? 'ACTIVO'
+        : 'SUSPENDIDO',
   };
 };
