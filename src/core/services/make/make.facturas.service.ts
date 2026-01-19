@@ -21,26 +21,31 @@ export const consultarFacturasEnMake = async (
 ): Promise<FacturasResponse> => {
   const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  // Extraemos la info real desde el WebService
-  const infoFinetic = data?.livingnet?.finetic;
+  // --- PASO CRÍTICO: Transformar el texto de Odoo en un objeto real ---
+  // Usamos JSON.parse porque 'livingnet' viene como String en el JSON original
+  let infoReal;
+  try {
+    const livingnetParsed = typeof data?.livingnet === 'string' 
+      ? JSON.parse(data.livingnet) 
+      : data?.livingnet;
+    
+    infoReal = livingnetParsed?.finetic;
+  } catch (error) {
+    console.error("Error al parsear livingnet:", error);
+  }
 
-  const contratos = infoFinetic?.contratos ?? [];
+  const contratos = infoReal?.contratos ?? [];
   const primerContrato = contratos[0];
   const primeraFactura = primerContrato?.facturas?.[0];
 
-  const saldoTotal = Number(infoFinetic?.saldototal ?? 0);
+  const saldoTotal = Number(infoReal?.saldototal ?? 0);
 
   return {
     ok: true,
-
-    nombreCliente: infoFinetic?.nombre ?? 'No encontrado',
-
+    nombreCliente: infoReal?.nombre ?? 'No encontrado',
     tieneDeuda: saldoTotal > 0,
-
     montoPendiente: saldoTotal,
-
     fechaVencimiento: primeraFactura?.fechaemision ?? null,
-
     estadoServicio:
       primerContrato?.estadocontrato === 'ejecucion'
         ? 'ACTIVO'
