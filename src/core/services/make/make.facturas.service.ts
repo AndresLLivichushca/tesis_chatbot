@@ -16,11 +16,26 @@ export type FacturasResponse = {
   estadoServicio: 'ACTIVO' | 'SUSPENDIDO' | 'DESCONOCIDO';
 };
 
-export const consultarFacturasEnMake = async (payload: FacturasRequest): Promise<FacturasResponse> => {
+export const consultarFacturasEnMake = async (
+  payload: FacturasRequest
+): Promise<FacturasResponse> => {
   const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  // 'data' ahora es directamente el objeto finetic { nombre, saldototal, ... }
-  if (!data || !data.nombre) {
+  console.log('RAW RESPONSE:', JSON.stringify(data));
+
+  // PASO CRÍTICO: Odoo v9 envía 'livingnet' como un String. Debemos convertirlo.
+  let livingnetObj;
+  try {
+    livingnetObj = typeof data?.livingnet === 'string' 
+      ? JSON.parse(data.livingnet) 
+      : data?.livingnet;
+  } catch (e) {
+    console.error("Error parseando JSON de Odoo:", e);
+  }
+
+  const finetic = livingnetObj?.finetic;
+
+  if (!finetic) {
     return {
       ok: true,
       nombreCliente: 'No encontrado',
@@ -31,15 +46,16 @@ export const consultarFacturasEnMake = async (payload: FacturasRequest): Promise
     };
   }
 
-  const contrato = data.contratos?.[0];
-  const saldo = Number(String(data.saldototal ?? 0).trim());
+  const contrato = finetic.contratos?.[0];
+  const factura = contrato?.facturas?.[0];
+  const saldo = Number(finetic.saldototal ?? 0);
 
   return {
     ok: true,
-    nombreCliente: data.nombre,
+    nombreCliente: finetic.nombre,
     tieneDeuda: saldo > 0,
     montoPendiente: saldo,
-    fechaVencimiento: contrato?.facturas?.[0]?.fechaemision ?? null,
+    fechaVencimiento: factura?.fechaemision ?? null,
     estadoServicio: contrato?.estadocontrato === 'ejecucion' ? 'ACTIVO' : 'SUSPENDIDO',
   };
 };
