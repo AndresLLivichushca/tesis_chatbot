@@ -32,21 +32,21 @@ export const consultarFacturasEnMake = async (
   let livingnetObj: any = null;
 
   try {
-    // 🔴 Odoo v9: livingnet viene como string roto
+    // 🟥 Caso Odoo v9: JSON viene como string roto
     if (typeof data?.livingnet === 'string') {
       const cleaned = data.livingnet
-        .replace(/^\s*"/, '')    // quita comilla inicial
-        .replace(/"\s*$/, '')    // quita comilla final
-        .replace(/\\"/g, '"');   // corrige escapes
+        .replace(/^\s*"/, '')
+        .replace(/"\s*$/, '')
+        .replace(/\\"/g, '"');
 
       livingnetObj = JSON.parse(cleaned);
-    } 
+    }
     // 🟢 Caso normal
     else {
       livingnetObj = data?.livingnet;
     }
-  } catch (err) {
-    console.error('ERROR parseando livingnet:', err);
+  } catch (error) {
+    console.error('ERROR parseando livingnet:', error);
   }
 
   const finetic = livingnetObj?.finetic;
