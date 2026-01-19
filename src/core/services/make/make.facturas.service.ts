@@ -32,7 +32,6 @@ export const consultarFacturasEnMake = async (
   let livingnetObj: any = null;
 
   try {
-    // 🟥 Caso Odoo v9: JSON viene como string roto
     if (typeof data?.livingnet === 'string') {
       const cleaned = data.livingnet
         .replace(/^\s*"/, '')
@@ -40,13 +39,11 @@ export const consultarFacturasEnMake = async (
         .replace(/\\"/g, '"');
 
       livingnetObj = JSON.parse(cleaned);
-    }
-    // 🟢 Caso normal
-    else {
+    } else {
       livingnetObj = data?.livingnet;
     }
-  } catch (error) {
-    console.error('ERROR parseando livingnet:', error);
+  } catch (err) {
+    console.error('ERROR parseando livingnet:', err);
   }
 
   const finetic = livingnetObj?.finetic;
