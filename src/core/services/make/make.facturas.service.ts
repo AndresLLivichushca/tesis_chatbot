@@ -19,48 +19,50 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
+
   const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
-  
-  let dataRaw = response.data;
-  let infoReal;
+  let data = response.data;
+
+  console.log('RAW RESPONSE:', data);
+
+  let livingnetObj: any = null;
 
   try {
-    // PASO 1: Si dataRaw es un String, lo limpiamos de caracteres que rompen el JSON
-    if (typeof dataRaw === 'string') {
-        // Limpiamos saltos de línea y espacios que Odoo v9 suele enviar
-        const cleanedData = dataRaw.replace(/\n/g, "").replace(/\r/g, "").trim();
-        dataRaw = JSON.parse(cleanedData);
-    }
+    // 🔴 Caso Odoo v9: livingnet viene como string mal formado
+    if (typeof data?.livingnet === 'string') {
+      const cleaned = data.livingnet
+        .replace(/^\s*"/, '')   // quita comilla inicial
+        .replace(/"\s*$/, '')   // quita comilla final
+        .replace(/\\"/g, '"');  // arregla escapes
 
-    // PASO 2: Extraer y limpiar livingnet
-    let livingnetRaw = dataRaw?.livingnet;
-    
-    if (typeof livingnetRaw === 'string') {
-        // Limpieza profunda del String interno antes del parseo
-        const cleanedLivingnet = livingnetRaw
-            .replace(/\\n/g, "")
-            .replace(/\\r/g, "")
-            .replace(/\s{2,}/g, " ") // Reduce múltiples espacios a uno solo
-            .trim();
-        livingnetRaw = JSON.parse(cleanedLivingnet);
+      livingnetObj = JSON.parse(cleaned);
+    } 
+    // 🟢 Caso normal
+    else {
+      livingnetObj = data?.livingnet;
     }
-    
-    infoReal = livingnetRaw?.finetic;
-  } catch (error) {
-    console.error("Error definitivo procesando JSON:", error);
+  } catch (err) {
+    console.error('ERROR parseando livingnet:', err);
   }
 
-  const contratos = infoReal?.contratos ?? [];
-  const primerContrato = contratos[0];
-  const primeraFactura = primerContrato?.facturas?.[0];
-  const saldoTotal = Number(infoReal?.saldototal ?? 0);
+  const finetic = livingnetObj?.finetic;
+  const contratos = finetic?.contratos ?? [];
+  const contrato = contratos[0];
+  const factura = contrato?.facturas?.[0];
+
+  const saldo = Number(finetic?.saldototal ?? 0);
 
   return {
     ok: true,
-    nombreCliente: infoReal?.nombre ?? 'No encontrado',
-    tieneDeuda: saldoTotal > 0,
-    montoPendiente: saldoTotal,
-    fechaVencimiento: primeraFactura?.fechaemision ?? null,
-    estadoServicio: primerContrato?.estadocontrato === 'ejecucion' ? 'ACTIVO' : 'SUSPENDIDO',
+    nombreCliente: finetic?.nombre ?? 'No encontrado',
+    tieneDeuda: saldo > 0,
+    montoPendiente: saldo,
+    fechaVencimiento: factura?.fechaemision ?? null,
+    estadoServicio:
+      contrato?.estadocontrato === 'ejecucion'
+        ? 'ACTIVO'
+        : contrato
+        ? 'SUSPENDIDO'
+        : 'DESCONOCIDO',
   };
 };
