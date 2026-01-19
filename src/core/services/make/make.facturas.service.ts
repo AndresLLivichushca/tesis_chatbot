@@ -27,7 +27,7 @@ export const consultarFacturasEnMake = async (
 
   console.log('RAW RESPONSE:', data);
 
-  const finetic = data?.livingnet?.finetic;
+  const finetic = data?.finetic;
 
   if (!finetic) {
     return {
