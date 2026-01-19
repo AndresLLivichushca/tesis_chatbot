@@ -26,27 +26,21 @@ export const consultarFacturasEnMake = async (
   );
 
   const data = response.data;
-
   console.log('RAW RESPONSE:', data);
 
-  let livingnetObj: any = null;
+  let livingnet: any;
 
   try {
     if (typeof data?.livingnet === 'string') {
-      const cleaned = data.livingnet
-        .replace(/^\s*"/, '')
-        .replace(/"\s*$/, '')
-        .replace(/\\"/g, '"');
-
-      livingnetObj = JSON.parse(cleaned);
+      livingnet = JSON.parse(data.livingnet);
     } else {
-      livingnetObj = data?.livingnet;
+      livingnet = data?.livingnet;
     }
   } catch (err) {
-    console.error('ERROR parseando livingnet:', err);
+    console.error('Error parseando livingnet:', err);
   }
 
-  const finetic = livingnetObj?.finetic;
+  const finetic = livingnet?.finetic;
 
   if (!finetic) {
     return {
@@ -72,6 +66,8 @@ export const consultarFacturasEnMake = async (
     estadoServicio:
       contrato?.estadocontrato === 'ejecucion'
         ? 'ACTIVO'
-        : 'SUSPENDIDO',
+        : contrato
+        ? 'SUSPENDIDO'
+        : 'DESCONOCIDO',
   };
 };
