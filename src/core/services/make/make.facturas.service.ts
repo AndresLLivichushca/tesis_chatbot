@@ -19,28 +19,33 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
-  // 1. Llamada a Make
   const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
   
-  // 2. Extraemos el cuerpo de la respuesta de Make
-  // Según tu captura image_a959a6, los datos vienen en 'Body' o directamente en 'data'
-  const data = response.data?.Body || response.data; 
-
-  console.log("DEBUG - Estructura recibida:", JSON.stringify(data));
+  // PASO 1: Forzar que 'data' sea un objeto si Make lo envía como String
+  let data = response.data;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {
+      console.error("Error parseando data inicial:", e);
+    }
+  }
 
   let infoReal;
   try {
-    // 3. Parseo de Odoo (vViemos que livingnet es un String en tus capturas)
-    const livingnetParsed = typeof data?.livingnet === 'string' 
-      ? JSON.parse(data.livingnet) 
-      : data?.livingnet;
+    // PASO 2: Doble parseo por la estructura de Odoo v9 observada en logs
+    let livingnetRaw = data?.livingnet;
+    
+    // Si livingnet sigue siendo un string con escapes (como se ve en tus logs), lo parseamos de nuevo
+    const livingnetParsed = typeof livingnetRaw === 'string' 
+      ? JSON.parse(livingnetRaw) 
+      : livingnetRaw;
     
     infoReal = livingnetParsed?.finetic;
   } catch (error) {
-    console.error("Error al procesar livingnet:", error);
+    console.error("Error procesando livingnet:", error);
   }
 
-  // 4. Mapeo final de campos
   const contratos = infoReal?.contratos ?? [];
   const primerContrato = contratos[0];
   const primeraFactura = primerContrato?.facturas?.[0];
@@ -52,11 +57,6 @@ export const consultarFacturasEnMake = async (
     tieneDeuda: saldoTotal > 0,
     montoPendiente: saldoTotal,
     fechaVencimiento: primeraFactura?.fechaemision ?? null,
-    estadoServicio:
-      primerContrato?.estadocontrato === 'ejecucion'
-        ? 'ACTIVO'
-        : primerContrato
-        ? 'SUSPENDIDO'
-        : 'DESCONOCIDO',
+    estadoServicio: primerContrato?.estadocontrato === 'ejecucion' ? 'ACTIVO' : 'SUSPENDIDO',
   };
 };
