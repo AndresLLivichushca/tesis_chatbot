@@ -20,12 +20,36 @@ export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
 
-  const { data } = await makeHttp.post(
+  const response = await makeHttp.post(
     env.MAKE_FACTURAS_WEBHOOK_URL,
     payload
   );
 
-  const finetic = data?.livingnet?.finetic;
+  const data = response.data;
+
+  console.log('RAW RESPONSE:', data);
+
+  let livingnetObj: any = null;
+
+  try {
+    // 🔴 Odoo v9: livingnet viene como string roto
+    if (typeof data?.livingnet === 'string') {
+      const cleaned = data.livingnet
+        .replace(/^\s*"/, '')    // quita comilla inicial
+        .replace(/"\s*$/, '')    // quita comilla final
+        .replace(/\\"/g, '"');   // corrige escapes
+
+      livingnetObj = JSON.parse(cleaned);
+    } 
+    // 🟢 Caso normal
+    else {
+      livingnetObj = data?.livingnet;
+    }
+  } catch (err) {
+    console.error('ERROR parseando livingnet:', err);
+  }
+
+  const finetic = livingnetObj?.finetic;
 
   if (!finetic) {
     return {
