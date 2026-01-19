@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { logInfo, logError } from '../../../shared/logger';
+import { logError, logInfo } from '../../../shared/logger';
 import { consultarFacturasEnMake } from '../../../core/services/make/make.facturas.service';
 
 export const manychatController = {
@@ -8,22 +8,28 @@ export const manychatController = {
 
     try {
       const body = req.body;
+      const startedAt = Date.now();
       logInfo('Incoming ManyChat', { requestId, body });
 
+      const cedula = String(body.cedula ?? '').trim();
+
       if (body.action === 'FACTURAS_ESTADO') {
-        const result = await consultarFacturasEnMake({ cedula: body.cedula });
+        const resultData = await consultarFacturasEnMake({ cedula });
         
-        // La respuesta debe ir dentro de la llave 'data' para el mapeo de ManyChat
+        logInfo('FACTURAS_ESTADO OK', { requestId, ms: Date.now() - startedAt });
+
+        // IMPORTANTE: Devolvemos 'data' como objeto plano para ManyChat
         return res.json({
           ok: true,
           requestId,
-          data: result
+          data: resultData
         });
       }
 
       return res.status(400).json({ ok: false, error: 'Acción no soportada' });
+
     } catch (err: any) {
-      logError('Error en controlador', { requestId, message: err.message });
+      logError('ManyChat handler error', { requestId, message: err?.message });
       return res.status(502).json({ ok: false, error: 'Error externo' });
     }
   },
