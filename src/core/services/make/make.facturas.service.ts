@@ -21,29 +21,28 @@ export const consultarFacturasEnMake = async (
 ): Promise<FacturasResponse> => {
   const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
   
-  // PASO 1: Forzar que 'data' sea un objeto si Make lo envía como String
-  let data = response.data;
-  if (typeof data === 'string') {
-    try {
-      data = JSON.parse(data);
-    } catch (e) {
-      console.error("Error parseando data inicial:", e);
-    }
-  }
-
+  // Obtenemos los datos crudos de la respuesta
+  let dataRaw = response.data;
   let infoReal;
+
   try {
-    // PASO 2: Doble parseo por la estructura de Odoo v9 observada en logs
-    let livingnetRaw = data?.livingnet;
+    // PASO 1: Si la data es un string, intentamos limpiarla y parsearla
+    if (typeof dataRaw === 'string') {
+        // Eliminamos posibles caracteres invisibles o escapes duplicados que rompen el JSON
+        dataRaw = JSON.parse(dataRaw);
+    }
+
+    // PASO 2: Extraer livingnet. Odoo v9 lo envía como String dentro del JSON
+    let livingnetData = dataRaw?.livingnet;
     
-    // Si livingnet sigue siendo un string con escapes (como se ve en tus logs), lo parseamos de nuevo
-    const livingnetParsed = typeof livingnetRaw === 'string' 
-      ? JSON.parse(livingnetRaw) 
-      : livingnetRaw;
+    // Si livingnet es un texto, lo convertimos en objeto
+    const parsedLivingnet = typeof livingnetData === 'string' 
+      ? JSON.parse(livingnetData) 
+      : livingnetData;
     
-    infoReal = livingnetParsed?.finetic;
+    infoReal = parsedLivingnet?.finetic;
   } catch (error) {
-    console.error("Error procesando livingnet:", error);
+    console.error("Error definitivo procesando JSON de Odoo:", error);
   }
 
   const contratos = infoReal?.contratos ?? [];

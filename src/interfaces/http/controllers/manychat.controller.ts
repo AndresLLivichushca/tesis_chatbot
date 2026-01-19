@@ -7,7 +7,6 @@ import { crearTicketEnMake } from '../../../core/services/make/make.tickets.serv
 type ManychatIncoming = {
   action: 'FACTURAS_ESTADO' | 'SERVICIO_ESTADO' | 'TICKET_CREAR';
   cedula?: string;
-
   telefono?: string;
   tipoProblema?: 'SIN_SERVICIO' | 'LENTO' | 'INTERMITENTE' | 'OTRO';
   descripcion?: string;
@@ -27,62 +26,38 @@ export const manychatController = {
       logInfo('Incoming ManyChat', { requestId, body });
 
       if (!body?.action) {
-        return res.status(400).json({
-          ok: false,
-          error: 'action es requerida',
-          requestId,
-        });
+        return res.status(400).json({ ok: false, error: 'action es requerida', requestId });
       }
 
       const cedula = String(body.cedula ?? '').trim();
       if (!cedula || !isCedulaValida(cedula)) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Cédula inválida (10 dígitos)',
-          requestId,
-        });
+        return res.status(400).json({ ok: false, error: 'Cédula inválida (10 dígitos)', requestId });
       }
 
       // ================= FACTURAS =================
       if (body.action === 'FACTURAS_ESTADO') {
         const data = await consultarFacturasEnMake({ cedula });
-
-        logInfo('FACTURAS_ESTADO OK', {
-          requestId,
-          ms: Date.now() - startedAt,
-        });
+        logInfo('FACTURAS_ESTADO OK', { requestId, ms: Date.now() - startedAt });
 
         return res.json({
           ok: true,
           requestId,
-          data,
+          data, // Aquí van los campos nombreCliente, montoPendiente, etc.
         });
       }
 
       // ================= SERVICIO =================
       if (body.action === 'SERVICIO_ESTADO') {
         const data = await consultarEstadoServicioEnMake({ cedula });
+        logInfo('SERVICIO_ESTADO OK', { requestId, ms: Date.now() - startedAt });
 
-        logInfo('SERVICIO_ESTADO OK', {
-          requestId,
-          ms: Date.now() - startedAt,
-        });
-
-        return res.json({
-          ok: true,
-          requestId,
-          data,
-        });
+        return res.json({ ok: true, requestId, data });
       }
 
       // ================= TICKET =================
       if (body.action === 'TICKET_CREAR') {
         if (!body.tipoProblema) {
-          return res.status(400).json({
-            ok: false,
-            error: 'tipoProblema es requerido',
-            requestId,
-          });
+          return res.status(400).json({ ok: false, error: 'tipoProblema es requerido', requestId });
         }
 
         const data = await crearTicketEnMake({
@@ -93,23 +68,11 @@ export const manychatController = {
           ubicacion: body.ubicacion,
         });
 
-        logInfo('TICKET_CREAR OK', {
-          requestId,
-          ms: Date.now() - startedAt,
-        });
-
-        return res.json({
-          ok: true,
-          requestId,
-          data,
-        });
+        logInfo('TICKET_CREAR OK', { requestId, ms: Date.now() - startedAt });
+        return res.json({ ok: true, requestId, data });
       }
 
-      return res.status(400).json({
-        ok: false,
-        error: 'action no soportada',
-        requestId,
-      });
+      return res.status(400).json({ ok: false, error: 'action no soportada', requestId });
 
     } catch (err: any) {
       logError('ManyChat handler error', {
