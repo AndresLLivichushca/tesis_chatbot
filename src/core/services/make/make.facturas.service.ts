@@ -25,10 +25,31 @@ export const consultarFacturasEnMake = async (
     payload
   );
 
-  console.log('RAW RESPONSE:', data);
+  console.log('RAW RESPONSE:', JSON.stringify(data));
 
-  const finetic = data?.finetic;
+  let finetic: any = null;
 
+  try {
+    /**
+     * CASO REAL:
+     * data.livingnet viene como STRING con JSON
+     */
+    if (typeof data?.livingnet === 'string') {
+      const parsed = JSON.parse(data.livingnet);
+      finetic = parsed?.finetic;
+    }
+
+    /**
+     * CASO IDEAL (por si luego arreglas Make)
+     */
+    else if (data?.livingnet?.finetic) {
+      finetic = data.livingnet.finetic;
+    }
+  } catch (error) {
+    console.error('ERROR parseando livingnet:', error);
+  }
+
+  // 🛑 Si no existe información
   if (!finetic) {
     return {
       ok: true,
@@ -46,7 +67,7 @@ export const consultarFacturasEnMake = async (
 
   return {
     ok: true,
-    nombreCliente: finetic.nombre,
+    nombreCliente: finetic.nombre ?? 'No encontrado',
     tieneDeuda: saldo > 0,
     montoPendiente: saldo,
     fechaVencimiento: factura?.fechaemision ?? null,
