@@ -20,31 +20,30 @@ export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
 
-  const { data } = await makeHttp.post(
+  const response = await makeHttp.post(
     env.MAKE_FACTURAS_WEBHOOK_URL,
     payload
   );
 
+  let data: any = response.data;
   console.log('RAW RESPONSE:', data);
 
-  let finetic: any = null;
-
   try {
-    // 🧨 Nivel 1: response completo es string
-    const level1 = typeof data === 'string'
-      ? JSON.parse(data)
-      : data;
+    // 🔥 Caso 1: respuesta completa es string
+    if (typeof data === 'string') {
+      data = JSON.parse(data);
+    }
 
-    // 🧨 Nivel 2: livingnet también es string
-    const level2 = typeof level1?.livingnet === 'string'
-      ? JSON.parse(level1.livingnet)
-      : level1?.livingnet;
+    // 🔥 Caso 2: livingnet es string (Odoo bug)
+    if (typeof data?.livingnet === 'string') {
+      data.livingnet = JSON.parse(data.livingnet);
+    }
 
-    finetic = level2?.finetic;
-
-  } catch (error) {
-    console.error('ERROR parseando response:', error);
+  } catch (err) {
+    console.error('ERROR parseando response:', err);
   }
+
+  const finetic = data?.livingnet?.finetic;
 
   if (!finetic) {
     return {
