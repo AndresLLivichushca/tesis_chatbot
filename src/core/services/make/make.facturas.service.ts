@@ -20,28 +20,14 @@ export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
 
-  const response = await makeHttp.post(
+  const { data } = await makeHttp.post(
     env.MAKE_FACTURAS_WEBHOOK_URL,
     payload
   );
 
-  const data = response.data;
-  console.log('RAW RESPONSE:', JSON.stringify(data));
+  console.log('RAW RESPONSE:', data);
 
-  let finetic: any = null;
-
-  try {
-    // 🔥 Caso REAL: livingnet.livingnet es string JSON
-    if (typeof data?.livingnet?.livingnet === 'string') {
-      finetic = JSON.parse(data.livingnet.livingnet)?.finetic;
-    }
-    // 🟢 Caso ideal
-    else if (data?.livingnet?.finetic) {
-      finetic = data.livingnet.finietic;
-    }
-  } catch (err) {
-    console.error('ERROR parseando livingnet:', err);
-  }
+  const finetic = data?.livingnet?.finetic;
 
   if (!finetic) {
     return {
