@@ -21,28 +21,33 @@ export const consultarFacturasEnMake = async (
 ): Promise<FacturasResponse> => {
   const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
   
-  // Obtenemos los datos crudos de la respuesta
   let dataRaw = response.data;
   let infoReal;
 
   try {
-    // PASO 1: Si la data es un string, intentamos limpiarla y parsearla
+    // PASO 1: Si dataRaw es un String, lo limpiamos de caracteres que rompen el JSON
     if (typeof dataRaw === 'string') {
-        // Eliminamos posibles caracteres invisibles o escapes duplicados que rompen el JSON
-        dataRaw = JSON.parse(dataRaw);
+        // Limpiamos saltos de línea y espacios que Odoo v9 suele enviar
+        const cleanedData = dataRaw.replace(/\n/g, "").replace(/\r/g, "").trim();
+        dataRaw = JSON.parse(cleanedData);
     }
 
-    // PASO 2: Extraer livingnet. Odoo v9 lo envía como String dentro del JSON
-    let livingnetData = dataRaw?.livingnet;
+    // PASO 2: Extraer y limpiar livingnet
+    let livingnetRaw = dataRaw?.livingnet;
     
-    // Si livingnet es un texto, lo convertimos en objeto
-    const parsedLivingnet = typeof livingnetData === 'string' 
-      ? JSON.parse(livingnetData) 
-      : livingnetData;
+    if (typeof livingnetRaw === 'string') {
+        // Limpieza profunda del String interno antes del parseo
+        const cleanedLivingnet = livingnetRaw
+            .replace(/\\n/g, "")
+            .replace(/\\r/g, "")
+            .replace(/\s{2,}/g, " ") // Reduce múltiples espacios a uno solo
+            .trim();
+        livingnetRaw = JSON.parse(cleanedLivingnet);
+    }
     
-    infoReal = parsedLivingnet?.finetic;
+    infoReal = livingnetRaw?.finetic;
   } catch (error) {
-    console.error("Error definitivo procesando JSON de Odoo:", error);
+    console.error("Error definitivo procesando JSON:", error);
   }
 
   const contratos = infoReal?.contratos ?? [];
