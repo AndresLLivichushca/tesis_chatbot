@@ -19,15 +19,21 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
+  const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  const { data } = await makeHttp.post(
-    env.MAKE_FACTURAS_WEBHOOK_URL,
-    payload
-  );
+  console.log('RAW RESPONSE:', JSON.stringify(data));
 
-  console.log('RAW RESPONSE:', data);
+  // PASO CRÍTICO: Odoo v9 envía 'livingnet' como un String. Debemos convertirlo.
+  let livingnetObj;
+  try {
+    livingnetObj = typeof data?.livingnet === 'string' 
+      ? JSON.parse(data.livingnet) 
+      : data?.livingnet;
+  } catch (e) {
+    console.error("Error parseando JSON de Odoo:", e);
+  }
 
-  const finetic = data?.livingnet?.finetic;
+  const finetic = livingnetObj?.finetic;
 
   if (!finetic) {
     return {
@@ -50,9 +56,6 @@ export const consultarFacturasEnMake = async (
     tieneDeuda: saldo > 0,
     montoPendiente: saldo,
     fechaVencimiento: factura?.fechaemision ?? null,
-    estadoServicio:
-      contrato?.estadocontrato === 'ejecucion'
-        ? 'ACTIVO'
-        : 'SUSPENDIDO',
+    estadoServicio: contrato?.estadocontrato === 'ejecucion' ? 'ACTIVO' : 'SUSPENDIDO',
   };
 };
