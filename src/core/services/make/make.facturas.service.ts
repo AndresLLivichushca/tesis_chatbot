@@ -1,4 +1,4 @@
-import { loadEnv } from '../../../config/env';
+ import { loadEnv } from '../../../config/env';
 import { makeHttp } from './make.client';
 
 const env = loadEnv();
@@ -16,34 +16,56 @@ export type FacturasResponse = {
   estadoServicio: 'ACTIVO' | 'SUSPENDIDO' | 'DESCONOCIDO';
 };
 
-export const consultarFacturasEnMake = async (payload: FacturasRequest) => {
+export const consultarFacturasEnMake = async (
+  payload: FacturasRequest
+): Promise<FacturasResponse> => {
   const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  let infoReal;
-  try {
-    // 1. Odoo envía un string sucio. Primero, quitamos las envolturas si existen.
-    const rawData = typeof data === 'string' ? JSON.parse(data) : data;
-    const livingnetStr = rawData?.livingnet;
+  let infoReal: any = null;
 
-    // 2. PASO CLAVE: Si livingnet es un string con JSON adentro, lo parseamos
-    if (typeof livingnetStr === 'string') {
-      // Intentamos un parseo profundo para Jessica Pugo
-      infoReal = JSON.parse(livingnetStr).finetic;
+  try {
+    // PASO 1: Asegurar objeto base (Make a veces envía string o objeto)
+    const baseData = typeof data === 'string' ? JSON.parse(data) : data;
+    
+    // PASO 2: Limpieza profunda del string sucio de Odoo
+    if (typeof baseData?.livingnet === 'string') {
+      // Eliminamos saltos de línea y carácteres de escape que rompen el parseo
+      const cleanedString = baseData.livingnet
+        .replace(/\\"/g, '"')       // Corrige comillas escapadas
+        .replace(/[\n\r\t]/g, "")    // Quita saltos de línea y tabs
+        .trim();
+      
+      const livingnetParsed = JSON.parse(cleanedString);
+      infoReal = livingnetParsed?.finetic;
     } else {
-      infoReal = livingnetStr?.finetic;
+      infoReal = baseData?.livingnet?.finetic;
     }
-  } catch (error) {
-    console.error("Error crítico de parseo:", error);
+  } catch (error: any) {
+    // Esto captura el error de la posición 16 y te da más detalle en Render
+    console.error("Fallo al limpiar el JSON de Odoo:", error.message);
   }
 
-  const contrato = infoReal?.contratos?.[0];
+  const contratos = infoReal?.contratos ?? [];
+  const primerContrato = contratos[0];
+  const primeraFactura = primerContrato?.facturas?.[0];
+
+  // Limpieza del saldo (Odoo a veces envía espacios en blanco como "  24.48")
+  const saldoRaw = infoReal?.saldototal ?? 0;
+  const saldoTotal = typeof saldoRaw === 'string' 
+    ? Number(saldoRaw.trim()) 
+    : Number(saldoRaw);
 
   return {
     ok: true,
-    nombreCliente: infoReal?.nombre ?? 'No encontrado', // Ahora sí saldrá Jessica
-    tieneDeuda: Number(infoReal?.saldototal ?? 0) > 0,
-    montoPendiente: Number(infoReal?.saldototal ?? 0),
-    fechaVencimiento: contrato?.facturas?.[0]?.fechaemision ?? null,
-    estadoServicio: contrato?.estadocontrato === 'ejecucion' ? 'ACTIVO' : 'SUSPENDIDO',
+    nombreCliente: infoReal?.nombre ?? 'No encontrado',
+    tieneDeuda: saldoTotal > 0,
+    montoPendiente: saldoTotal,
+    fechaVencimiento: primeraFactura?.fechaemision ?? null,
+    estadoServicio:
+      primerContrato?.estadocontrato === 'ejecucion'
+        ? 'ACTIVO'
+        : primerContrato
+        ? 'SUSPENDIDO'
+        : 'DESCONOCIDO',
   };
 };
