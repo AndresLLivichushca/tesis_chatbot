@@ -21,13 +21,14 @@ export const consultarFacturasEnMake = async (
 ): Promise<FacturasResponse> => {
   const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  // --- PASO CRÍTICO: Transformar el texto de Odoo en un objeto real ---
-  // Usamos JSON.parse porque 'livingnet' viene como String en el JSON original
   let infoReal;
   try {
-    const livingnetParsed = typeof data?.livingnet === 'string' 
-      ? JSON.parse(data.livingnet) 
-      : data?.livingnet;
+    // 1. Manejamos el caso donde 'data' mismo sea un string o el objeto livingnet sea string
+    const baseData = typeof data === 'string' ? JSON.parse(data) : data;
+    
+    const livingnetParsed = typeof baseData?.livingnet === 'string' 
+      ? JSON.parse(baseData.livingnet) 
+      : baseData?.livingnet;
     
     infoReal = livingnetParsed?.finetic;
   } catch (error) {
@@ -38,7 +39,11 @@ export const consultarFacturasEnMake = async (
   const primerContrato = contratos[0];
   const primeraFactura = primerContrato?.facturas?.[0];
 
-  const saldoTotal = Number(infoReal?.saldototal ?? 0);
+  // 2. Limpiamos el saldo: Odoo a veces envía "   24.48" como string con espacios
+  const saldoRaw = infoReal?.saldototal ?? 0;
+  const saldoTotal = typeof saldoRaw === 'string' 
+    ? Number(saldoRaw.trim()) 
+    : Number(saldoRaw);
 
   return {
     ok: true,
