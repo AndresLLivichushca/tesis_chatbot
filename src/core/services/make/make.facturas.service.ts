@@ -29,33 +29,19 @@ export const consultarFacturasEnMake = async (
   console.log('RAW RESPONSE:', data);
 
   try {
-    // 1️⃣ Si todo viene como string
+    // 1️⃣ Si TODO viene como string
     if (typeof data === 'string') {
       data = JSON.parse(data);
     }
 
-    // 2️⃣ livingnet viene como string con JSON roto
+    // 2️⃣ livingnet viene como string con JSON dentro
     if (typeof data?.livingnet === 'string') {
-
-      // ⚠️ limpieza defensiva
-      const fixed = data.livingnet
-        .replace(/^\s*"/, '')
-        .replace(/"\s*$/, '');
-
+      const fixed = data.livingnet.replace(/\\"/g, '"');
       data.livingnet = JSON.parse(fixed);
     }
 
   } catch (err) {
     console.error('ERROR parseando response:', err);
-
-    return {
-      ok: true,
-      nombreCliente: 'No encontrado',
-      tieneDeuda: false,
-      montoPendiente: 0,
-      fechaVencimiento: null,
-      estadoServicio: 'DESCONOCIDO',
-    };
   }
 
   const finetic = data?.livingnet?.finetic;
