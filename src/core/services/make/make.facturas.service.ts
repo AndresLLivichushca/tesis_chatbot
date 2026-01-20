@@ -29,15 +29,14 @@ export const consultarFacturasEnMake = async (
   console.log('RAW RESPONSE:', data);
 
   try {
-    // 1️⃣ Si TODO viene como string
+    // 🔥 Caso 1: respuesta completa es string
     if (typeof data === 'string') {
       data = JSON.parse(data);
     }
 
-    // 2️⃣ livingnet viene como string con JSON dentro
+    // 🔥 Caso 2: livingnet es string (Odoo bug)
     if (typeof data?.livingnet === 'string') {
-      const fixed = data.livingnet.replace(/\\"/g, '"');
-      data.livingnet = JSON.parse(fixed);
+      data.livingnet = JSON.parse(data.livingnet);
     }
 
   } catch (err) {
