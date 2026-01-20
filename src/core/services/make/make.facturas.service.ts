@@ -16,46 +16,34 @@ export type FacturasResponse = {
   estadoServicio: 'ACTIVO' | 'SUSPENDIDO' | 'DESCONOCIDO';
 };
 
-export const consultarFacturasEnMake = async (
-  payload: FacturasRequest
-): Promise<FacturasResponse> => {
+export const consultarFacturasEnMake = async (payload: FacturasRequest) => {
   const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
   let infoReal;
   try {
-    // 1. Manejamos el caso donde 'data' mismo sea un string o el objeto livingnet sea string
-    const baseData = typeof data === 'string' ? JSON.parse(data) : data;
-    
-    const livingnetParsed = typeof baseData?.livingnet === 'string' 
-      ? JSON.parse(baseData.livingnet) 
-      : baseData?.livingnet;
-    
-    infoReal = livingnetParsed?.finetic;
+    // 1. Odoo envía un string sucio. Primero, quitamos las envolturas si existen.
+    const rawData = typeof data === 'string' ? JSON.parse(data) : data;
+    const livingnetStr = rawData?.livingnet;
+
+    // 2. PASO CLAVE: Si livingnet es un string con JSON adentro, lo parseamos
+    if (typeof livingnetStr === 'string') {
+      // Intentamos un parseo profundo para Jessica Pugo
+      infoReal = JSON.parse(livingnetStr).finetic;
+    } else {
+      infoReal = livingnetStr?.finetic;
+    }
   } catch (error) {
-    console.error("Error al parsear livingnet:", error);
+    console.error("Error crítico de parseo:", error);
   }
 
-  const contratos = infoReal?.contratos ?? [];
-  const primerContrato = contratos[0];
-  const primeraFactura = primerContrato?.facturas?.[0];
-
-  // 2. Limpiamos el saldo: Odoo a veces envía "   24.48" como string con espacios
-  const saldoRaw = infoReal?.saldototal ?? 0;
-  const saldoTotal = typeof saldoRaw === 'string' 
-    ? Number(saldoRaw.trim()) 
-    : Number(saldoRaw);
+  const contrato = infoReal?.contratos?.[0];
 
   return {
     ok: true,
-    nombreCliente: infoReal?.nombre ?? 'No encontrado',
-    tieneDeuda: saldoTotal > 0,
-    montoPendiente: saldoTotal,
-    fechaVencimiento: primeraFactura?.fechaemision ?? null,
-    estadoServicio:
-      primerContrato?.estadocontrato === 'ejecucion'
-        ? 'ACTIVO'
-        : primerContrato
-        ? 'SUSPENDIDO'
-        : 'DESCONOCIDO',
+    nombreCliente: infoReal?.nombre ?? 'No encontrado', // Ahora sí saldrá Jessica
+    tieneDeuda: Number(infoReal?.saldototal ?? 0) > 0,
+    montoPendiente: Number(infoReal?.saldototal ?? 0),
+    fechaVencimiento: contrato?.facturas?.[0]?.fechaemision ?? null,
+    estadoServicio: contrato?.estadocontrato === 'ejecucion' ? 'ACTIVO' : 'SUSPENDIDO',
   };
 };
