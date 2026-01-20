@@ -1,10 +1,11 @@
 import OpenAI from 'openai';
-import { loadEnv } from '../../config/env';
-//integracia IA
-const env = loadEnv();
+
+// Usamos directamente process.env para asegurar que Render la detecte
 const openai = new OpenAI({
-  apiKey: (env as any).OPENAI_API_KEY, 
+  apiKey: process.env.OPENAI_API_KEY || '', 
 });
+
+// ... resto de tu código
 
 export async function generarRespuestaIA(
   mensajeUsuario: string,
