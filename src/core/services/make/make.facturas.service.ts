@@ -1,4 +1,4 @@
- import { loadEnv } from '../../../config/env';
+import { loadEnv } from '../../../config/env';
 import { makeHttp } from './make.client';
 
 const env = loadEnv();
@@ -19,41 +19,32 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
-  const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
+  // 1. Llamada a Make
+  const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
+  
+  // 2. Extraemos el cuerpo de la respuesta de Make
+  // Según tu captura image_a959a6, los datos vienen en 'Body' o directamente en 'data'
+  const data = response.data?.Body || response.data; 
 
-  let infoReal: any = null;
+  console.log("DEBUG - Estructura recibida:", JSON.stringify(data));
 
+  let infoReal;
   try {
-    // PASO 1: Asegurar objeto base (Make a veces envía string o objeto)
-    const baseData = typeof data === 'string' ? JSON.parse(data) : data;
+    // 3. Parseo de Odoo (vViemos que livingnet es un String en tus capturas)
+    const livingnetParsed = typeof data?.livingnet === 'string' 
+      ? JSON.parse(data.livingnet) 
+      : data?.livingnet;
     
-    // PASO 2: Limpieza profunda del string sucio de Odoo
-    if (typeof baseData?.livingnet === 'string') {
-      // Eliminamos saltos de línea y carácteres de escape que rompen el parseo
-      const cleanedString = baseData.livingnet
-        .replace(/\\"/g, '"')       // Corrige comillas escapadas
-        .replace(/[\n\r\t]/g, "")    // Quita saltos de línea y tabs
-        .trim();
-      
-      const livingnetParsed = JSON.parse(cleanedString);
-      infoReal = livingnetParsed?.finetic;
-    } else {
-      infoReal = baseData?.livingnet?.finetic;
-    }
-  } catch (error: any) {
-    // Esto captura el error de la posición 16 y te da más detalle en Render
-    console.error("Fallo al limpiar el JSON de Odoo:", error.message);
+    infoReal = livingnetParsed?.finetic;
+  } catch (error) {
+    console.error("Error al procesar livingnet:", error);
   }
 
+  // 4. Mapeo final de campos
   const contratos = infoReal?.contratos ?? [];
   const primerContrato = contratos[0];
   const primeraFactura = primerContrato?.facturas?.[0];
-
-  // Limpieza del saldo (Odoo a veces envía espacios en blanco como "  24.48")
-  const saldoRaw = infoReal?.saldototal ?? 0;
-  const saldoTotal = typeof saldoRaw === 'string' 
-    ? Number(saldoRaw.trim()) 
-    : Number(saldoRaw);
+  const saldoTotal = Number(infoReal?.saldototal ?? 0);
 
   return {
     ok: true,
