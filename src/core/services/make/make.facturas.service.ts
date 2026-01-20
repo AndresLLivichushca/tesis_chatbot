@@ -19,31 +19,25 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
-  // 1. Llamada a Make
-  const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
-  
-  // 2. Extraemos el cuerpo de la respuesta de Make
-  // Según tu captura image_a959a6, los datos vienen en 'Body' o directamente en 'data'
-  const data = response.data?.Body || response.data; 
+  const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  console.log("DEBUG - Estructura recibida:", JSON.stringify(data));
-
+  // --- PASO CRÍTICO: Transformar el texto de Odoo en un objeto real ---
+  // Usamos JSON.parse porque 'livingnet' viene como String en el JSON original
   let infoReal;
   try {
-    // 3. Parseo de Odoo (vViemos que livingnet es un String en tus capturas)
     const livingnetParsed = typeof data?.livingnet === 'string' 
       ? JSON.parse(data.livingnet) 
       : data?.livingnet;
     
     infoReal = livingnetParsed?.finetic;
   } catch (error) {
-    console.error("Error al procesar livingnet:", error);
+    console.error("Error al parsear livingnet:", error);
   }
 
-  // 4. Mapeo final de campos
   const contratos = infoReal?.contratos ?? [];
   const primerContrato = contratos[0];
   const primeraFactura = primerContrato?.facturas?.[0];
+
   const saldoTotal = Number(infoReal?.saldototal ?? 0);
 
   return {
