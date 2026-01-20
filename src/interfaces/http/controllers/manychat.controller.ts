@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { logError, logInfo } from '../../../shared/logger';
 import { consultarFacturasEnMake } from '../../../core/services/make/make.facturas.service';
 import { generarRespuestaIA } from '../../../core/ai/ai.service';
-//integracion controlador
+
 export const handleIncoming = async (req: Request, res: Response) => {
   const requestId = (req as any).requestId;
 
@@ -11,23 +11,31 @@ export const handleIncoming = async (req: Request, res: Response) => {
     const startedAt = Date.now();
     logInfo('Incoming ManyChat', { requestId, body });
 
+    // Extraemos las variables que configuraste en ManyChat
     const { action, cedula, last_user_message } = body;
 
-    if (action === 'FACTURAS_ESTADO') {
-      // 1. Obtenemos los datos de la factura
-      const factura = await consultarFacturasEnMake({ cedula: String(cedula).trim() });
+    // Acción unificada para tu tesis
+    if (action === 'CONSULTA_GENERAL' || action === 'FACTURAS_ESTADO') {
       
-      // 2. Generamos la respuesta con IA usando el mensaje del usuario y los datos de la factura
-      const respuestaIA = await generarRespuestaIA(last_user_message || "Hola, ¿cuál es mi estado?", factura);
+      // 1. Consultamos datos reales en Odoo vía Make
+      const factura = await consultarFacturasEnMake({ 
+        cedula: String(cedula || body.cedula_cliente || '').trim() 
+      });
+      
+      // 2. La IA genera la respuesta usando los datos técnicos y el mensaje del usuario
+      const respuestaIA = await generarRespuestaIA(
+        last_user_message || body.mensaje_usuario || "Hola", 
+        factura
+      );
 
-      logInfo('FACTURAS_ESTADO con IA OK', { requestId, ms: Date.now() - startedAt });
+      logInfo('Respuesta generada con éxito', { requestId, ms: Date.now() - startedAt });
 
+      // Enviamos el objeto 'data' que ManyChat mapeará
       return res.json({
         ok: true,
-        requestId,
         data: {
           ...factura,
-          mensajeIA: respuestaIA // Esta es la variable que debes mapear en ManyChat
+          mensajeIA: respuestaIA 
         }
       });
     }
@@ -35,7 +43,7 @@ export const handleIncoming = async (req: Request, res: Response) => {
     return res.status(400).json({ ok: false, error: 'Acción no soportada' });
 
   } catch (err: any) {
-    logError('ManyChat handler error', { requestId, message: err?.message });
-    return res.status(502).json({ ok: false, error: 'Error externo' });
+    logError('Error en el controlador', { requestId, message: err?.message });
+    return res.status(502).json({ ok: false, error: 'Error en la comunicación con servicios externos' });
   }
 };
