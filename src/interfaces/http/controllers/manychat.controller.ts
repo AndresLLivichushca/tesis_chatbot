@@ -11,31 +11,33 @@ export const handleIncoming = async (req: Request, res: Response) => {
     const startedAt = Date.now();
     logInfo('Incoming ManyChat', { requestId, body });
 
-    // Extraemos las variables que configuraste en ManyChat
-    const { action, cedula, last_user_message } = body;
+    // Extraemos las variables, incluyendo el historial que configuraremos en ManyChat
+    const { action, cedula, last_user_message, historial_chat } = body;
 
-    // Acción unificada para tu tesis
     if (action === 'CONSULTA_GENERAL' || action === 'FACTURAS_ESTADO') {
       
-      // 1. Consultamos datos reales en Odoo vía Make
+      // 1. Consultamos datos reales en Odoo
       const factura = await consultarFacturasEnMake({ 
         cedula: String(cedula || body.cedula_cliente || '').trim() 
       });
       
-      // 2. La IA genera la respuesta usando los datos técnicos y el mensaje del usuario
+      // 2. Generamos respuesta pasando el historial para que tenga memoria
       const respuestaIA = await generarRespuestaIA(
         last_user_message || body.mensaje_usuario || "Hola", 
-        factura
+        factura,
+        historial_chat || ""
       );
 
-      logInfo('Respuesta generada con éxito', { requestId, ms: Date.now() - startedAt });
+      logInfo('Respuesta con memoria generada', { requestId, ms: Date.now() - startedAt });
 
-      // Enviamos el objeto 'data' que ManyChat mapeará
+      // Enviamos el objeto 'data' incluyendo el nuevo historial acumulado
       return res.json({
         ok: true,
         data: {
           ...factura,
-          mensajeIA: respuestaIA 
+          mensajeIA: respuestaIA,
+          // Guardamos el hilo de la charla para la siguiente interacción
+          nuevo_historial: `${historial_chat || ''}\nUsuario: ${last_user_message}\nIA: ${respuestaIA}`.trim()
         }
       });
     }
@@ -44,6 +46,6 @@ export const handleIncoming = async (req: Request, res: Response) => {
 
   } catch (err: any) {
     logError('Error en el controlador', { requestId, message: err?.message });
-    return res.status(502).json({ ok: false, error: 'Error en la comunicación con servicios externos' });
+    return res.status(502).json({ ok: false, error: 'Error en la comunicación' });
   }
 };

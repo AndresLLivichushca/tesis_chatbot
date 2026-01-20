@@ -1,4 +1,3 @@
-// src/core/ai/ai.service.ts
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -8,7 +7,7 @@ const openai = new OpenAI({
 export async function generarRespuestaIA(
   mensajeUsuario: string,
   factura: any,
-  historial: any[] = [] // Opcional: para mantener el hilo de la charla
+  historialChat: string = ""
 ): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
@@ -16,26 +15,30 @@ export async function generarRespuestaIA(
       messages: [
         { 
           role: 'system', 
-          content: `Eres el soporte técnico de IPS. Tu objetivo es diagnosticar fallas de internet PASO A PASO. 
+          content: `Eres el soporte técnico experto de IPS. Tu misión es resolver fallas de internet PASO A PASO. 
           
-          REGLA DE ORO: Da solo UNA instrucción a la vez y espera que el cliente responda.
+          MEMORIA DE LA CONVERSACIÓN:
+          ${historialChat}
+
+          REGLAS CRÍTICAS:
+          1. Analiza el historial arriba. Si YA pediste revisar luces, energía o reiniciar, NO lo repitas. Pasa al SIGUIENTE paso.
+          2. Da solo UNA instrucción corta y clara por mensaje.
           
-          DATOS: Cliente: ${factura.nombreCliente}, Deuda: $${factura.montoPendiente}, Estado: ${factura.estadoServicio}.
-          
-          FLUJO DE DIAGNÓSTICO:
-          1. Primero: Pide verificar si las luces del router están encendidas.
-          2. Segundo: Pide verificar si hay luz en el sector o si el router está bien enchufado.
-          3. Tercero: Pide reiniciar el equipo (10 segundos fuera de la corriente).
-          4. LÍMITE: Si después de estos 3 pasos el cliente sigue con fallas, dile: "En vista de que no hemos podido solucionar el inconveniente por aquí, ¿deseas que te comunique con un miembro de soporte humano?".` 
+          FLUJO OBLIGATORIO:
+          - Paso 1: Pedir verificar luces del router.
+          - Paso 2: Pedir verificar energía en el sector/enchufe.
+          - Paso 3: Pedir reiniciar el router (10 seg fuera).
+          - Final: Si tras los 3 pasos sigue fallando, pregunta si desea hablar con soporte humano.
+
+          DATOS CLIENTE: ${factura.nombreCliente}, Deuda: $${factura.montoPendiente}.` 
         },
-        ...historial, // Aquí podrías pasar los últimos mensajes de ManyChat
         { role: 'user', content: mensajeUsuario },
       ],
-      temperature: 0.5, // Menor temperatura para ser más preciso con el protocolo
+      temperature: 0.4, // Más bajo para ser más estricto con el protocolo
     });
 
     return response.choices[0].message.content ?? '';
   } catch (error) {
-    return "Lo siento, tuve un problema técnico. Intenta de nuevo.";
+    return "Lo siento, tuve un problema técnico. ¿Podemos intentar de nuevo?";
   }
 }
