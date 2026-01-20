@@ -20,55 +20,49 @@ export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
 
-  const response = await makeHttp.post(
-    env.MAKE_FACTURAS_WEBHOOK_URL,
-    payload
-  );
+  const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
+  let data = response.data;
 
-  let data: any = response.data;
   console.log('RAW RESPONSE:', data);
 
+  let livingnetObj: any = null;
+
   try {
-    // 🔥 Caso 1: respuesta completa es string
-    if (typeof data === 'string') {
-      data = JSON.parse(data);
-    }
-
-    // 🔥 Caso 2: livingnet es string (Odoo bug)
+    // 🔴 Caso Odoo v9: livingnet viene como string mal formado
     if (typeof data?.livingnet === 'string') {
-      data.livingnet = JSON.parse(data.livingnet);
+      const cleaned = data.livingnet
+        .replace(/^\s*"/, '')   // quita comilla inicial
+        .replace(/"\s*$/, '')   // quita comilla final
+        .replace(/\\"/g, '"');  // arregla escapes
+
+      livingnetObj = JSON.parse(cleaned);
+    } 
+    // 🟢 Caso normal
+    else {
+      livingnetObj = data?.livingnet;
     }
-
   } catch (err) {
-    console.error('ERROR parseando response:', err);
+    console.error('ERROR parseando livingnet:', err);
   }
 
-  const finetic = data?.livingnet?.finetic;
-
-  if (!finetic) {
-    return {
-      ok: true,
-      nombreCliente: 'No encontrado',
-      tieneDeuda: false,
-      montoPendiente: 0,
-      fechaVencimiento: null,
-      estadoServicio: 'DESCONOCIDO',
-    };
-  }
-
-  const contrato = finetic.contratos?.[0];
+  const finetic = livingnetObj?.finetic;
+  const contratos = finetic?.contratos ?? [];
+  const contrato = contratos[0];
   const factura = contrato?.facturas?.[0];
-  const saldo = Number(finetic.saldototal ?? 0);
+
+  const saldo = Number(finetic?.saldototal ?? 0);
 
   return {
     ok: true,
-    nombreCliente: finetic.nombre,
+    nombreCliente: finetic?.nombre ?? 'No encontrado',
     tieneDeuda: saldo > 0,
     montoPendiente: saldo,
     fechaVencimiento: factura?.fechaemision ?? null,
     estadoServicio:
       contrato?.estadocontrato === 'ejecucion'
         ? 'ACTIVO'
-        : 'SUSPENDIDO',
+        : contrato
+        ? 'SUSPENDIDO'
+        : 'DESCONOCIDO',
   };
 };
