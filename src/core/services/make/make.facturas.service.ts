@@ -19,49 +19,43 @@ export type FacturasResponse = {
 export const consultarFacturasEnMake = async (
   payload: FacturasRequest
 ): Promise<FacturasResponse> => {
-
+  // 1. Llamada a Make
   const response = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
-  let data = response.data;
+  
+  // 2. Extraemos el cuerpo de la respuesta de Make
+  // Según tu captura image_a959a6, los datos vienen en 'Body' o directamente en 'data'
+  const data = response.data?.Body || response.data; 
 
-  console.log('RAW RESPONSE:', data);
+  console.log("DEBUG - Estructura recibida:", JSON.stringify(data));
 
-  let livingnetObj: any = null;
-
+  let infoReal;
   try {
-    // 🔴 Caso Odoo v9: livingnet viene como string mal formado
-    if (typeof data?.livingnet === 'string') {
-      const cleaned = data.livingnet
-        .replace(/^\s*"/, '')   // quita comilla inicial
-        .replace(/"\s*$/, '')   // quita comilla final
-        .replace(/\\"/g, '"');  // arregla escapes
-
-      livingnetObj = JSON.parse(cleaned);
-    } 
-    // 🟢 Caso normal
-    else {
-      livingnetObj = data?.livingnet;
-    }
-  } catch (err) {
-    console.error('ERROR parseando livingnet:', err);
+    // 3. Parseo de Odoo (vViemos que livingnet es un String en tus capturas)
+    const livingnetParsed = typeof data?.livingnet === 'string' 
+      ? JSON.parse(data.livingnet) 
+      : data?.livingnet;
+    
+    infoReal = livingnetParsed?.finetic;
+  } catch (error) {
+    console.error("Error al procesar livingnet:", error);
   }
 
-  const finetic = livingnetObj?.finetic;
-  const contratos = finetic?.contratos ?? [];
-  const contrato = contratos[0];
-  const factura = contrato?.facturas?.[0];
-
-  const saldo = Number(finetic?.saldototal ?? 0);
+  // 4. Mapeo final de campos
+  const contratos = infoReal?.contratos ?? [];
+  const primerContrato = contratos[0];
+  const primeraFactura = primerContrato?.facturas?.[0];
+  const saldoTotal = Number(infoReal?.saldototal ?? 0);
 
   return {
     ok: true,
-    nombreCliente: finetic?.nombre ?? 'No encontrado',
-    tieneDeuda: saldo > 0,
-    montoPendiente: saldo,
-    fechaVencimiento: factura?.fechaemision ?? null,
+    nombreCliente: infoReal?.nombre ?? 'No encontrado',
+    tieneDeuda: saldoTotal > 0,
+    montoPendiente: saldoTotal,
+    fechaVencimiento: primeraFactura?.fechaemision ?? null,
     estadoServicio:
-      contrato?.estadocontrato === 'ejecucion'
+      primerContrato?.estadocontrato === 'ejecucion'
         ? 'ACTIVO'
-        : contrato
+        : primerContrato
         ? 'SUSPENDIDO'
         : 'DESCONOCIDO',
   };
