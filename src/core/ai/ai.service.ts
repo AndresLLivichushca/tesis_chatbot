@@ -7,57 +7,59 @@ const openai = new OpenAI({
 export async function generarRespuestaIA(
   mensajeUsuario: string,
   factura: any,
-  historialChat: string = "",
-  pasoActual: number = 0
-): Promise<string> {
+  historialChat: string,
+  pasoDiagnostico: number,
+  intentos: number
+): Promise<{ texto: string; esDiagnostico: boolean }> {
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `
-Eres el asistente técnico de la empresa de internet IPS.
+  const mensaje = mensajeUsuario.toLowerCase();
 
-DATOS DEL CLIENTE:
-- Nombre: ${factura.nombreCliente}
-- Saldo pendiente: $${factura.montoPendiente}
-- Estado del servicio: Activo
+  // 1️⃣ Detectar intención
+  const esFalla =
+    mensaje.includes('lento') ||
+    mensaje.includes('sin internet') ||
+    mensaje.includes('no tengo internet') ||
+    mensaje.includes('fallas');
 
-HISTORIAL DE CONVERSACIÓN:
-${historialChat}
+  const esSaldo =
+    mensaje.includes('saldo') ||
+    mensaje.includes('debo') ||
+    mensaje.includes('pagar');
 
-PASO ACTUAL DEL DIAGNÓSTICO: ${pasoActual}
-
-REGLAS ABSOLUTAS:
-1. Responde SOLO UNA instrucción por mensaje.
-2. NO repitas pasos anteriores.
-3. NO menciones números de paso.
-4. NO ofrezcas soporte humano (eso lo maneja el sistema).
-5. Sé claro, corto y amable.
-
-PROTOCOLO TÉCNICO:
-- pasoActual = 0 → Pedir verificar luces del router
-- pasoActual = 1 → Pedir verificar energía / enchufe
-- pasoActual = 2 → Pedir reiniciar router (10 segundos)
-- pasoActual >= 3 → Responde exactamente: "DIAGNOSTICO_COMPLETADO"
-
-Si el mensaje del usuario NO es técnico (saldo, pagos, info):
-- Responde normalmente usando los datos del cliente.
-`
-        },
-        {
-          role: 'user',
-          content: mensajeUsuario,
-        },
-      ],
-      temperature: 0.4,
-    });
-
-    return response.choices[0].message.content ?? '';
-
-  } catch (error) {
-    return "Lo siento, tuve un problema técnico. ¿Podemos intentar de nuevo?";
+  // 2️⃣ Respuesta directa de saldo (NO afecta intentos)
+  if (esSaldo && !esFalla) {
+    return {
+      esDiagnostico: false,
+      texto: `Tu saldo actual es de $${factura.montoPendiente} y la fecha de vencimiento es el ${factura.fechaVencimiento}.`,
+    };
   }
+
+  // 3️⃣ Si NO es falla técnica, responder normal
+  if (!esFalla) {
+    return {
+      esDiagnostico: false,
+      texto: '¿En qué más puedo ayudarte? Puedo revisar tu saldo o ayudarte con problemas de internet.',
+    };
+  }
+
+  // 4️⃣ Si es falla técnica y ya agotó intentos
+  if (intentos >= 3) {
+    return {
+      esDiagnostico: true,
+      texto:
+        'He agotado las pruebas básicas y no logramos solucionar el problema. ¿Deseas comunicarte con un técnico de soporte humano?',
+    };
+  }
+
+  // 5️⃣ Diagnóstico paso a paso
+  const pasos = [
+    'Por favor verifica si las luces del router están encendidas.',
+    'Verifica si el router está bien enchufado y si hay luz en tu sector.',
+    'Desconecta el router por 10 segundos y vuelve a encenderlo.',
+  ];
+
+  return {
+    esDiagnostico: true,
+    texto: pasos[pasoDiagnostico] || pasos[0],
+  };
 }
