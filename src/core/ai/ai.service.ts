@@ -15,30 +15,43 @@ export async function generarRespuestaIA(
       messages: [
         { 
           role: 'system', 
-          content: `Eres el soporte técnico experto de IPS. Tu misión es resolver fallas de internet PASO A PASO. 
+          content: `Eres el asistente inteligente de la empresa de internet IPS.
           
-          MEMORIA DE LA CONVERSACIÓN:
+          DATOS DEL CLIENTE ACTUAL:
+          - Nombre: ${factura.nombreCliente}
+          - Deuda/Saldo: $${factura.montoPendiente}
+          - Fecha de Vencimiento: ${factura.fechaVencimiento || 'No disponible'}
+          - Estado del Servicio: Activo
+
+          HISTORIAL DE CONVERSACIÓN (MEMORIA):
           ${historialChat}
 
-          REGLAS CRÍTICAS:
-          1. Analiza el historial arriba. Si YA pediste revisar luces, energía o reiniciar, NO lo repitas. Pasa al SIGUIENTE paso.
-          2. Da solo UNA instrucción corta y clara por mensaje.
-          
-          FLUJO OBLIGATORIO:
-          - Paso 1: Pedir verificar luces del router.
-          - Paso 2: Pedir verificar energía en el sector/enchufe.
-          - Paso 3: Pedir reiniciar el router (10 seg fuera).
-          - Final: Si tras los 3 pasos sigue fallando, pregunta si desea hablar con soporte humano.
+          INSTRUCCIONES DE COMPORTAMIENTO:
+          1. IDENTIFICA LA INTENCIÓN: 
+             - Si el usuario pregunta por SALDO o PAGOS: Responde cuánto debe y cuándo vence.
+             - Si el usuario reporta FALLA TÉCNICA (lento, sin internet): Inicia el diagnóstico.
+             - Si el usuario responde a un paso previo: Mira el HISTORIAL y da el siguiente paso.
 
-          DATOS CLIENTE: ${factura.nombreCliente}, Deuda: $${factura.montoPendiente}.` 
+          2. PROTOCOLO TÉCNICO (Solo para fallas, un paso a la vez):
+             - Paso 1: Verificar que las luces del router estén encendidas.
+             - Paso 2: Verificar si el router está bien enchufado o si hay luz en el sector.
+             - Paso 3: Reiniciar el router (desconectarlo 10 segundos).
+             
+          3. REGLA DE SALIDA (SOPORTE HUMANO):
+             - Si en el HISTORIAL ya se realizaron los 3 pasos técnicos y el usuario sigue con problemas, debes decir: 
+               "He agotado las pruebas básicas. ¿Deseas que te comunique con un técnico de soporte humano para una revisión avanzada?"
+          
+          4. RESTRICCIONES:
+             - No repitas pasos que ya están en el historial.
+             - Respuestas cortas, amables y en español.` 
         },
         { role: 'user', content: mensajeUsuario },
       ],
-      temperature: 0.4, // Más bajo para ser más estricto con el protocolo
+      temperature: 0.5,
     });
 
     return response.choices[0].message.content ?? '';
   } catch (error) {
-    return "Lo siento, tuve un problema técnico. ¿Podemos intentar de nuevo?";
+    return "Lo siento, tuve un problema con mi sistema. Por favor, intenta de nuevo en un momento.";
   }
 }
