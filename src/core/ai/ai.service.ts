@@ -7,8 +7,15 @@ const openai = new OpenAI({
 export async function generarRespuestaIA(
   mensajeUsuario: string,
   factura: any,
-  historialChat: string = ""
+  historialChat: string = "",
+  pasoActual: number = 0 // Recibimos el contador de ManyChat
+
 ): Promise<string> {
+
+  if (pasoActual >= 3) {
+    return "HE_AGOTADO_INTENTOS"; 
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -25,7 +32,8 @@ export async function generarRespuestaIA(
 
           HISTORIAL DE CONVERSACIÓN (MEMORIA):
           ${historialChat}
-
+          INTENTO ACTUAL: ${pasoActual} de 3.
+          
           INSTRUCCIONES DE COMPORTAMIENTO:
           1. IDENTIFICA LA INTENCIÓN: 
              - Si el usuario pregunta por SALDO o PAGOS: Responde cuánto debe y cuándo vence.
