@@ -15,14 +15,15 @@ export const handleIncoming = async (req: Request, res: Response) => {
     console.log(`[Render] Respuesta generada: ${resultado.texto}`);
     console.log(`[Render] ¿Es diagnóstico?: ${resultado.esDiagnostico}`);
 
-    return res.json({
-      ok: true,
-      data: {
-        mensajeIA: resultado.texto,
-        nuevo_historial: `${historial_chat}\nUsuario: ${mensaje_usuario}\nIA: ${resultado.texto}`.trim(),
-        es_diagnostico: resultado.esDiagnostico // ManyChat usará esto para el conteo
-      },
-    });
+   return res.json({
+    ok: true,
+    data: {
+      mensajeIA: resultado.texto,
+      nuevo_historial: `${historial_chat}\nUsuario: ${mensaje_usuario}\nIA: ${resultado.texto}`.trim(),
+      // Si la IA dice que es diagnóstico, mandamos un 1, si no un 0
+      puntos_a_sumar: resultado.esDiagnostico ? 1 : 0 
+    },
+  });
   } catch (error) {
     console.error('[Error Render]:', error);
     return res.status(500).json({ ok: false });
