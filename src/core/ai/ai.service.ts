@@ -1,8 +1,6 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
 export async function generarRespuestaIA(
   mensajeUsuario: string,
@@ -12,46 +10,41 @@ export async function generarRespuestaIA(
   intentos: number
 ): Promise<{ texto: string; esDiagnostico: boolean }> {
   
-  const mensajeActual = mensajeUsuario.toLowerCase();
+  const mensaje = mensajeUsuario.toLowerCase();
 
-  // 1️⃣ Detección de intención basada SOLO en el mensaje nuevo para evitar repeticiones
-  const esSaldo = mensajeActual.includes('saldo') || mensajeActual.includes('debo') || mensajeActual.includes('pagar');
-  const esFalla = mensajeActual.includes('lento') || mensajeActual.includes('internet') || mensajeActual.includes('fallas');
+  // 1️⃣ Detección de intención
+  const esFalla = mensaje.includes('lento') || mensaje.includes('internet') || mensaje.includes('fallas');
+  const esSaldo = mensaje.includes('saldo') || mensaje.includes('debo') || mensaje.includes('pagar');
 
-  // 2️⃣ Prioridad: Respuesta de Saldo
+  console.log(`[IA] Intención detectada - Falla: ${esFalla}, Saldo: ${esSaldo}`);
+
+  // 2️⃣ Respuesta de saldo (No afecta el contador de diagnóstico)
   if (esSaldo && !esFalla) {
     return {
       esDiagnostico: false,
-      texto: `Hola ${factura.nombreCliente}, tu saldo actual es de $${factura.montoPendiente} y vence el ${factura.fechaVencimiento}.`
+      texto: `Hola ${factura.nombreCliente}, tu saldo es de $${factura.montoPendiente} venciendo el ${factura.fechaVencimiento}.`
     };
   }
 
-  // 3️⃣ Lógica de Falla Técnica (Soporte Humano si intentos >= 3)
+  // 3️⃣ Protocolo de Falla Técnica
   if (esFalla || pasoDiagnostico > 0) {
-    if (intentos >= 3) {
-      return {
-        esDiagnostico: true,
-        texto: 'He agotado las pruebas básicas. ¿Deseas comunicarte con soporte técnico humano?'
-      };
-    }
-
-    // 4️⃣ Diagnóstico Secuencial
     const pasos = [
-      'Por favor verifica si las luces del router están encendidas.', // Paso 0
-      'Verifica si el router está bien enchufado y si hay luz en tu sector.', // Paso 1
-      'Desconecta el router por 10 segundos y vuelve a encenderlo.' // Paso 2
+      'Paso 1: Verifica si las luces del router están encendidas.',
+      'Paso 2: Revisa que los cables estén bien conectados.',
+      'Paso 3: Reinicia el router desconectándolo 10 segundos.'
     ];
 
-    // Retorna el paso actual según lo que envíe ManyChat
-    return {
-      esDiagnostico: true,
-      texto: pasos[pasoDiagnostico] || pasos[0]
-    };
+    // Si ya superó los pasos, preparamos el mensaje de soporte
+    if (pasoDiagnostico >= 3) {
+       return { esDiagnostico: true, texto: 'DIAGNOSTICO_AGOTADO' };
+    }
+
+    return { esDiagnostico: true, texto: pasos[pasoDiagnostico] || pasos[0] };
   }
 
-  // 5️⃣ Respuesta por defecto (Saludo/Ayuda general)
+  // 4️⃣ Respuesta General
   return {
     esDiagnostico: false,
-    texto: `¡Hola ${factura.nombreCliente}! ¿En qué puedo ayudarte? Puedo darte tu saldo o ayudarte con fallas de internet.`
+    texto: `¡Hola! Puedo ayudarte con tu saldo o soporte técnico de internet. ¿Qué necesitas?`
   };
 }

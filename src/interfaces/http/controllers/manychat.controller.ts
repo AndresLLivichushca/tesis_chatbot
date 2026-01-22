@@ -4,40 +4,27 @@ import { generarRespuestaIA } from '../../../core/ai/ai.service';
 
 export const handleIncoming = async (req: Request, res: Response) => {
   try {
-    const {
-      cedula,
-      mensaje_usuario,
-      historial_chat,
-      paso_diagnostico = 0,
-      intentos_ips = 0,
-    } = req.body;
+    console.log('--- NUEVA SOLICITUD MANYCHAT ---');
+    console.log('Body recibido:', JSON.stringify(req.body, null, 2));
 
-    // Consultar datos de la factura
+    const { cedula, mensaje_usuario, historial_chat, paso_diagnostico = 0, intentos_ips = 0 } = req.body;
+
     const factura = await consultarFacturasEnMake({ cedula });
+    const resultado = await generarRespuestaIA(mensaje_usuario, factura, historial_chat, paso_diagnostico, intentos_ips);
 
-    // Generar respuesta con la nueva lógica
-    const resultado = await generarRespuestaIA(
-      mensaje_usuario,
-      factura,
-      historial_chat || '',
-      Number(paso_diagnostico),
-      Number(intentos_ips)
-    );
-
-    // Formatear el nuevo historial para ManyChat
-    const nuevoHistorial = `${historial_chat || ''}\nUsuario: ${mensaje_usuario}\nIA: ${resultado.texto}`.trim();
+    console.log(`[Render] Respuesta generada: ${resultado.texto}`);
+    console.log(`[Render] ¿Es diagnóstico?: ${resultado.esDiagnostico}`);
 
     return res.json({
       ok: true,
       data: {
         mensajeIA: resultado.texto,
-        nuevo_historial: nuevoHistorial,
-        // Informamos a ManyChat si debe aumentar el contador
-        es_diagnostico: resultado.esDiagnostico
+        nuevo_historial: `${historial_chat}\nUsuario: ${mensaje_usuario}\nIA: ${resultado.texto}`.trim(),
+        es_diagnostico: resultado.esDiagnostico // ManyChat usará esto para el conteo
       },
     });
   } catch (error) {
-    console.error('Error en controlador:', error);
+    console.error('[Error Render]:', error);
     return res.status(500).json({ ok: false });
   }
 };
