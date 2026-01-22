@@ -12,25 +12,32 @@ export const handleIncoming = async (req: Request, res: Response) => {
       intentos_ips = 0,
     } = req.body;
 
+    // Consultar datos de la factura
     const factura = await consultarFacturasEnMake({ cedula });
 
+    // Generar respuesta con la nueva lógica
     const resultado = await generarRespuestaIA(
       mensaje_usuario,
       factura,
       historial_chat || '',
-      paso_diagnostico,
-      intentos_ips
+      Number(paso_diagnostico),
+      Number(intentos_ips)
     );
+
+    // Formatear el nuevo historial para ManyChat
+    const nuevoHistorial = `${historial_chat || ''}\nUsuario: ${mensaje_usuario}\nIA: ${resultado.texto}`.trim();
 
     return res.json({
       ok: true,
       data: {
         mensajeIA: resultado.texto,
-        nuevo_historial: `${historial_chat || ''}\nUsuario: ${mensaje_usuario}\nIA: ${resultado.texto}`.trim(),
-        aumentar_intento: resultado.esDiagnostico ? 1 : 0,
+        nuevo_historial: nuevoHistorial,
+        // Informamos a ManyChat si debe aumentar el contador
+        es_diagnostico: resultado.esDiagnostico
       },
     });
   } catch (error) {
+    console.error('Error en controlador:', error);
     return res.status(500).json({ ok: false });
   }
 };
