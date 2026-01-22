@@ -7,8 +7,7 @@ export const handleIncoming = async (req: Request, res: Response) => {
     cedula,
     mensaje_usuario,
     historial_chat = '',
-    paso_diagnostico = 0,
-    intentos_ips = 0
+    paso_diagnostico = 0
   } = req.body;
 
   const factura = await consultarFacturasEnMake({ cedula });
@@ -17,8 +16,7 @@ export const handleIncoming = async (req: Request, res: Response) => {
     mensaje_usuario,
     factura,
     historial_chat,
-    paso_diagnostico,
-    intentos_ips
+    paso_diagnostico
   );
 
   return res.json({
@@ -27,7 +25,8 @@ export const handleIncoming = async (req: Request, res: Response) => {
       mensajeIA: resultado.texto,
       nuevo_historial:
         `${historial_chat}\nUsuario: ${mensaje_usuario}\nIA: ${resultado.texto}`.trim(),
-      puntos_a_sumar: resultado.esDiagnostico ? 1 : 0
+      puntos_a_sumar: resultado.esDiagnostico ? 1 : 0,
+      reset_paso: resultado.resetPaso || false
     }
   });
 };
