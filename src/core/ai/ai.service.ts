@@ -2,74 +2,60 @@ import OpenAI from 'openai';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
-export async function generarRespuestaIA(
-  mensajeUsuario: string,
-  factura: any,
-  historial: string,
-  paso: number
-): Promise<{ texto: string; esDiagnostico: boolean; resetPaso?: boolean }> {
+// ai.service.ts
 
-  console.log('==============================');
-  console.log('[IA] Nueva ejecución');
-  console.log('[IA] Mensaje usuario:', mensajeUsuario);
-  console.log('[IA] Paso recibido:', paso);
-  console.log('[IA] Historial:', historial);
+import { DIAGNOSTICO_PROMPT } from './ai.prompt';
+import { DiagnosticoIAResponse } from './ai.types';
 
-  const msg = mensajeUsuario.toLowerCase();
+export async function ejecutarDiagnosticoIA({
+  mensajeUsuario,
+  pasoDiagnostico,
+  intentosIps,
+  ultimoFueFalla,
+}: {
+  mensajeUsuario: string;
+  pasoDiagnostico: number;
+  intentosIps: number;
+  ultimoFueFalla: boolean;
+}): Promise<DiagnosticoIAResponse> {
 
-  const esSaldo = /(saldo|debo|pagar|factura)/.test(msg);
-  const esFalla = /(lento|internet|fallas|no tengo|problema)/.test(msg)|| paso > 0;
+  console.log('[IA] Input:', {
+    mensajeUsuario,
+    pasoDiagnostico,
+    intentosIps,
+    ultimoFueFalla,
+  });
 
-  console.log('[IA] Intenciones detectadas →');
-  console.log('     esSaldo:', esSaldo);
-  console.log('     esFalla:', esFalla);
+  const prompt = DIAGNOSTICO_PROMPT
+    .replace('{{mensaje_usuario}}', mensajeUsuario)
+    .replace('{{paso_diagnostico}}', pasoDiagnostico.toString())
+    .replace('{{intentos_ips}}', intentosIps.toString())
+    .replace('{{ultimo_fue_falla}}', ultimoFueFalla.toString());
 
-  // SALDO
-  if (esSaldo) {
-    console.log('[IA] Ruta: SALDO');
-    console.log('[IA] → Resetear paso diagnóstico');
+  console.log('[IA] Prompt enviado');
 
-    return {
-      texto: `Tu saldo actual es $${factura.montoPendiente} y vence el ${factura.fechaVencimiento}.`,
-      esDiagnostico: false,
-      resetPaso: true
-    };
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    temperature: 0.3,
+    messages: [
+      { role: 'system', content: prompt },
+    ],
+  });
+
+  const raw = completion.choices[0].message.content;
+
+  console.log('[IA] Respuesta cruda:', raw);
+
+  let parsed: DiagnosticoIAResponse;
+
+  try {
+    parsed = JSON.parse(raw || '');
+  } catch (error) {
+    console.error('[IA] ERROR JSON inválido', error);
+    throw new Error('Respuesta IA inválida');
   }
 
-  // SOPORTE TÉCNICO
-  if (esFalla) {
-    console.log('[IA] Ruta: SOPORTE TÉCNICO');
+  console.log('[IA] Respuesta parseada:', parsed);
 
-    const pasos = [
-      'Paso 1: Verifica si las luces del router están encendidas.',
-      'Paso 2: Revisa que los cables estén correctamente conectados.',
-      'Paso 3: Reinicia el router desconectándolo 10 segundos.'
-    ];
-
-    console.log('[IA] Total pasos diagnóstico:', pasos.length);
-
-    if (paso >= pasos.length) {
-      console.log('[IA] Diagnóstico agotado');
-      return {
-        texto: 'DIAGNOSTICO_AGOTADO',
-        esDiagnostico: true
-      };
-    }
-
-    console.log(`[IA] Enviando paso índice: ${paso}`);
-    console.log(`[IA] Texto enviado: ${pasos[paso]}`);
-
-    return {
-      texto: pasos[paso],
-      esDiagnostico: true
-    };
-  }
-
-  // MENSAJE GENERAL
-  console.log('[IA] Ruta: MENSAJE GENERAL');
-
-  return {
-    texto: 'Puedo ayudarte con tu saldo o con soporte técnico de internet.',
-    esDiagnostico: false
-  };
+  return parsed;
 }
