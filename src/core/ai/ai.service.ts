@@ -18,7 +18,7 @@ export async function generarRespuestaIA(
   const msg = mensajeUsuario.toLowerCase();
 
   const esSaldo = /(saldo|debo|pagar|factura)/.test(msg);
-  const esFalla = /(lento|internet|fallas|no tengo|problema)/.test(msg);
+  const esFalla = /(lento|internet|fallas|no tengo|problema)/.test(msg)|| paso > 0;
 
   console.log('[IA] Intenciones detectadas →');
   console.log('     esSaldo:', esSaldo);
