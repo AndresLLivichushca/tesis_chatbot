@@ -24,7 +24,7 @@ export async function generarRespuestaIA(
   console.log('     esSaldo:', esSaldo);
   console.log('     esFalla:', esFalla);
 
-  // 1️⃣ SALDO
+  // SALDO
   if (esSaldo) {
     console.log('[IA] Ruta: SALDO');
     console.log('[IA] → Resetear paso diagnóstico');
@@ -36,7 +36,7 @@ export async function generarRespuestaIA(
     };
   }
 
-  // 2️⃣ SOPORTE TÉCNICO
+  // SOPORTE TÉCNICO
   if (esFalla) {
     console.log('[IA] Ruta: SOPORTE TÉCNICO');
 
@@ -65,7 +65,7 @@ export async function generarRespuestaIA(
     };
   }
 
-  // 3️⃣ MENSAJE GENERAL
+  // MENSAJE GENERAL
   console.log('[IA] Ruta: MENSAJE GENERAL');
 
   return {

@@ -9,7 +9,11 @@ export const handleIncoming = async (req: Request, res: Response) => {
     historial_chat = '',
     paso_diagnostico = 0
   } = req.body;
-
+// Limpieza de historial en el controlador
+let historialLimpio = historial_chat;
+if (historial_chat.includes('{{cuf') || historial_chat === 'null' || historial_chat === '.') {
+    historialLimpio = ""; 
+}
   const factura = await consultarFacturasEnMake({ cedula });
 
   const resultado = await generarRespuestaIA(
