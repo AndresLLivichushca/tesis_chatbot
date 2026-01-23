@@ -24,15 +24,26 @@ export const handleIncoming = async (req: Request, res: Response) => {
     }
 
     // 📡 Consulta a Make (facturación)
-    const factura = await consultarFacturasEnMake({ cedula });
+    await consultarFacturasEnMake({ cedula });
 
-    // 🤖 IA manda TODO el flujo
+    // 🤖 Ejecutar diagnóstico IA
     const resultado = await ejecutarDiagnosticoIA({
       mensajeUsuario: mensaje_usuario,
       pasoDiagnostico: paso_diagnostico,
       intentosIps: intentos_ips,
       ultimoFueFalla: ultimo_fue_falla
     });
+
+    // 🧠 Cálculo del NUEVO estado (CLAVE)
+    const nuevoPaso = resultado.reset_paso
+      ? 0
+      : paso_diagnostico + resultado.paso_incremento;
+
+    const nuevosIntentos =
+      intentos_ips + resultado.intentos_incremento;
+
+    const nuevoUltimoFueFalla =
+      resultado.ultimo_fue_falla;
 
     // 🧠 Historial nuevo
     const nuevoHistorial = `
@@ -41,7 +52,7 @@ Usuario: ${mensaje_usuario}
 IA: ${resultado.mensaje}
 `.trim();
 
-    // 📤 RESPUESTA LIMPIA PARA MANYCHAT
+    // 📤 RESPUESTA PARA MANYCHAT
     return res.json({
       ok: true,
       data: {
@@ -51,16 +62,16 @@ IA: ${resultado.mensaje}
         estado: resultado.estado,
         finalizar: resultado.finalizar,
 
-        // Control del diagnóstico
-        paso_incremento: resultado.paso_incremento,
-        intentos_incremento: resultado.intentos_incremento,
-        reset_paso: resultado.reset_paso,
-        ultimo_fue_falla: resultado.ultimo_fue_falla,
+        // 🔥 CAMPOS QUE MANYCHAT DEBE GUARDAR
+        paso_diagnostico: nuevoPaso,
+        intentos_ips: nuevosIntentos,
+        ultimo_fue_falla: nuevoUltimoFueFalla,
 
         // Memoria
         nuevo_historial: nuevoHistorial
       }
     });
+
   } catch (error) {
     console.error('[handleIncoming] ERROR:', error);
 
