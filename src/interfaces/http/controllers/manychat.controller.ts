@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { consultarFacturasEnMake } from '../../../core/services/make/make.facturas.service';
 import { ejecutarDiagnosticoIA } from '../../../core/ai/ai.service';
+import { detectarIntencionIA } from '../../../core/ai/ai.router.service';
 
 export const handleIncoming = async (req: Request, res: Response) => {
   try {
@@ -13,71 +14,78 @@ export const handleIncoming = async (req: Request, res: Response) => {
       ultimo_fue_falla = false
     } = req.body;
 
-    // 🧼 Limpieza de historial (bug {{cuf}})
-    let historialLimpio = historial_chat;
-    if (
-      historial_chat.includes('{{cuf') ||
-      historial_chat === 'null' ||
-      historial_chat === '.'
-    ) {
-      historialLimpio = '';
+    // 1️⃣ Detectar intención
+    const router = await detectarIntencionIA(mensaje_usuario);
+
+    // 2️⃣ Rutas NO técnicas
+    if (router.intencion === 'SALDO' || router.intencion === 'FACTURA') {
+      const factura = await consultarFacturasEnMake({ cedula });
+
+      const mensajeSaldo = factura.tieneDeuda
+        ? `Hola ${factura.nombreCliente} 😊  
+    Tu saldo pendiente es de $${factura.montoPendiente}.  
+    Fecha de vencimiento: ${factura.fechaVencimiento ?? 'no registrada'}.
+
+    ¿Deseas pagar ahora o necesitas ayuda?`
+        : `Hola ${factura.nombreCliente} 🙌  
+    No registramos valores pendientes.  
+    Tu servicio se encuentra ${factura.estadoServicio.toLowerCase()}.`;
+
+      return res.json({
+        ok: true,
+        data: {
+          mensajeIA: mensajeSaldo,
+          estado: 'FINALIZAR',
+          finalizar: true
+        }
+      });
     }
 
-    // 📡 Consulta a Make (facturación)
-    await consultarFacturasEnMake({ cedula });
+    if (router.intencion === 'SOPORTE') {
+      return res.json({
+        ok: true,
+        data: {
+          mensajeIA: 'Te comunicaré con un asesor humano 👨‍💻',
+          estado: 'FINALIZAR',
+          finalizar: true
+        }
+      });
+    }
 
-    // 🤖 Ejecutar diagnóstico IA
-    const resultado = await ejecutarDiagnosticoIA({
-      mensajeUsuario: mensaje_usuario,
-      pasoDiagnostico: paso_diagnostico,
-      intentosIps: intentos_ips,
-      ultimoFueFalla: ultimo_fue_falla
-    });
+    // 3️⃣ SOLO AQUÍ entra diagnóstico de internet
+    if (router.intencion === 'INTERNET') {
+      const resultado = await ejecutarDiagnosticoIA({
+        mensajeUsuario: mensaje_usuario,
+        pasoDiagnostico: paso_diagnostico,
+        intentosIps: intentos_ips,
+        ultimoFueFalla: ultimo_fue_falla
+      });
 
-    // 🧠 Cálculo del NUEVO estado (CLAVE)
-    const nuevoPaso = resultado.reset_paso
-      ? 0
-      : paso_diagnostico + resultado.paso_incremento;
+      return res.json({
+        ok: true,
+        data: {
+          mensajeIA: resultado.mensaje,
+          estado: resultado.estado,
+          finalizar: resultado.finalizar,
+          paso_diagnostico: resultado.reset_paso ? 0 : paso_diagnostico + resultado.paso_incremento,
+          intentos_ips: intentos_ips + resultado.intentos_incremento,
+          ultimo_fue_falla: resultado.ultimo_fue_falla
+        }
+      });
+    }
 
-    const nuevosIntentos =
-      intentos_ips + resultado.intentos_incremento;
-
-    const nuevoUltimoFueFalla =
-      resultado.ultimo_fue_falla;
-
-    // 🧠 Historial nuevo
-    const nuevoHistorial = `
-${historialLimpio}
-Usuario: ${mensaje_usuario}
-IA: ${resultado.mensaje}
-`.trim();
-
-    // 📤 RESPUESTA PARA MANYCHAT
+    // 4️⃣ General
     return res.json({
       ok: true,
       data: {
-        mensajeIA: resultado.mensaje,
-
-        // Estado del flujo
-        estado: resultado.estado,
-        finalizar: resultado.finalizar,
-
-        // 🔥 CAMPOS QUE MANYCHAT DEBE GUARDAR
-        paso_diagnostico: nuevoPaso,
-        intentos_ips: nuevosIntentos,
-        ultimo_fue_falla: nuevoUltimoFueFalla,
-
-        // Memoria
-        nuevo_historial: nuevoHistorial
+        mensajeIA: '¿Podrías explicarme un poco más para ayudarte mejor?',
+        estado: 'CONTINUAR',
+        finalizar: false
       }
     });
 
   } catch (error) {
-    console.error('[handleIncoming] ERROR:', error);
-
-    return res.status(500).json({
-      ok: false,
-      error: 'Error procesando la solicitud'
-    });
+    console.error(error);
+    return res.status(500).json({ ok: false });
   }
 };
