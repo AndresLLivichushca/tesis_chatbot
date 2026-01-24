@@ -16,9 +16,16 @@ export const handleIncoming = async (req: Request, res: Response) => {
 
     // 1️⃣ Detectar intención
     const router = await detectarIntencionIA(mensaje_usuario);
+    console.log('INTENCION DETECTADA:', router);
 
-    // 2️⃣ Rutas NO técnicas
-    if (router.intencion === 'SALDO' || router.intencion === 'FACTURA') {
+    const mensajeLower = mensaje_usuario.toLowerCase();
+
+    if (
+      mensajeLower.includes('saldo') ||
+      mensajeLower.includes('deuda') ||
+      mensajeLower.includes('factura') ||
+      mensajeLower.includes('pagar')
+    ) {
       const factura = await consultarFacturasEnMake({ cedula });
 
       const mensajeSaldo = factura.tieneDeuda
