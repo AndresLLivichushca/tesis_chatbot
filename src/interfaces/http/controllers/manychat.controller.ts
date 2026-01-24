@@ -8,35 +8,32 @@ export const handleIncoming = async (req: Request, res: Response) => {
     const {
       cedula,
       mensaje_usuario,
-      historial_chat = '',
       paso_diagnostico = 0,
       intentos_ips = 0,
       ultimo_fue_falla = false
     } = req.body;
 
-    // 1️⃣ Detectar intención
+    // 1️⃣ Detectar intención (ÚNICA fuente de decisión)
     const router = await detectarIntencionIA(mensaje_usuario);
     console.log('INTENCION DETECTADA:', router);
 
-    const mensajeLower = mensaje_usuario.toLowerCase();
-
-    if (
-      mensajeLower.includes('saldo') ||
-      mensajeLower.includes('deuda') ||
-      mensajeLower.includes('factura') ||
-      mensajeLower.includes('pagar')
-    ) {
+    /**
+     * ===============================
+     * 🟢 SALDO / FACTURA
+     * ===============================
+     */
+    if (router.intencion === 'SALDO' || router.intencion === 'FACTURA') {
       const factura = await consultarFacturasEnMake({ cedula });
 
       const mensajeSaldo = factura.tieneDeuda
         ? `Hola ${factura.nombreCliente} 😊  
-    Tu saldo pendiente es de $${factura.montoPendiente}.  
-    Fecha de vencimiento: ${factura.fechaVencimiento ?? 'no registrada'}.
+Tu saldo pendiente es de $${factura.montoPendiente}.  
+Fecha de vencimiento: ${factura.fechaVencimiento ?? 'no registrada'}.
 
-    ¿Deseas pagar ahora o necesitas ayuda?`
+¿Deseas pagar ahora o necesitas ayuda?`
         : `Hola ${factura.nombreCliente} 🙌  
-    No registramos valores pendientes.  
-    Tu servicio se encuentra ${factura.estadoServicio.toLowerCase()}.`;
+No registramos valores pendientes.  
+Tu servicio se encuentra ${factura.estadoServicio.toLowerCase()}.`;
 
       return res.json({
         ok: true,
@@ -48,6 +45,11 @@ export const handleIncoming = async (req: Request, res: Response) => {
       });
     }
 
+    /**
+     * ===============================
+     * 🟢 SOPORTE HUMANO
+     * ===============================
+     */
     if (router.intencion === 'SOPORTE') {
       return res.json({
         ok: true,
@@ -59,7 +61,11 @@ export const handleIncoming = async (req: Request, res: Response) => {
       });
     }
 
-    // 3️⃣ SOLO AQUÍ entra diagnóstico de internet
+    /**
+     * ===============================
+     * 🟢 DIAGNÓSTICO INTERNET
+     * ===============================
+     */
     if (router.intencion === 'INTERNET') {
       const resultado = await ejecutarDiagnosticoIA({
         mensajeUsuario: mensaje_usuario,
@@ -74,14 +80,20 @@ export const handleIncoming = async (req: Request, res: Response) => {
           mensajeIA: resultado.mensaje,
           estado: resultado.estado,
           finalizar: resultado.finalizar,
-          paso_diagnostico: resultado.reset_paso ? 0 : paso_diagnostico + resultado.paso_incremento,
+          paso_diagnostico: resultado.reset_paso
+            ? 0
+            : paso_diagnostico + resultado.paso_incremento,
           intentos_ips: intentos_ips + resultado.intentos_incremento,
           ultimo_fue_falla: resultado.ultimo_fue_falla
         }
       });
     }
 
-    // 4️⃣ General
+    /**
+     * ===============================
+     * 🟢 GENERAL
+     * ===============================
+     */
     return res.json({
       ok: true,
       data: {
@@ -92,7 +104,7 @@ export const handleIncoming = async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('[ERROR HANDLE INCOMING]', error);
     return res.status(500).json({ ok: false });
   }
 };
