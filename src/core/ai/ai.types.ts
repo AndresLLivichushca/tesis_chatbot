@@ -20,7 +20,7 @@ export interface DiagnosticoIAResponse {
   mensaje: string;
   estado: EstadoBot;
   paso_incremento: number;
-  intentos_incremento: number;
+  intentos_incremento: number; // Coincide con tu prompt
   ultimo_fue_falla: boolean;
   reset_paso: boolean;
   finalizar: boolean;
