@@ -21,14 +21,14 @@ export const consultarFacturasEnMake = async (
 ): Promise<FacturasResponse> => {
   const { data } = await makeHttp.post(env.MAKE_FACTURAS_WEBHOOK_URL, payload);
 
-  // Como el nuevo endpoint envía JSON limpio, accedemos directo
-  // Los datos pueden venir en la propiedad 'soticom' o 'finetic'
+  // Intentamos obtener la info de soticom o finetic
   const infoReal = data?.livingnet?.soticom || data?.livingnet?.finetic;
 
-  if (!infoReal) {
+  // Si no hay info o el nombre no existe, devolvemos un estado controlado
+  if (!infoReal || !infoReal.nombre) {
     return {
       ok: true,
-      nombreCliente: 'No encontrado',
+      nombreCliente: 'Cliente No Registrado', // Cambiamos 'No encontrado' por algo más claro
       tieneDeuda: false,
       montoPendiente: 0,
       fechaVencimiento: null,
@@ -39,7 +39,6 @@ export const consultarFacturasEnMake = async (
   const contratos = infoReal.contratos ?? [];
   const primerContrato = contratos[0];
   const primeraFactura = primerContrato?.facturas?.[0];
-
   const saldoTotal = Number(infoReal.saldototal ?? 0);
 
   return {
