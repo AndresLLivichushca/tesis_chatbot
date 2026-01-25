@@ -2,17 +2,26 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { Request, Response } from 'express';
 import { manychatRouter } from './interfaces/http/routes/manychat.routes';
 import { requestIdMiddleware } from './interfaces/http/middlewares/requestId.middleware';
 
 export const createApp = () => {
   const app = express();
 
+  // CONFIGURACIÓN CRÍTICA PARA RENDER
+  app.set('trust proxy', 1); 
+
   app.use(express.json());
   app.use(cors());
   app.use(helmet());
-  app.use(rateLimit({ windowMs: 60_000, max: 120 }));
+
+  // Configuración de rate limit ajustada para confiar en el proxy
+  app.use(rateLimit({ 
+    windowMs: 60_000, 
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
 
   app.use(requestIdMiddleware);
 

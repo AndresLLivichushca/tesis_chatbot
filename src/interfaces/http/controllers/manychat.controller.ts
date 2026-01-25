@@ -4,16 +4,23 @@ import { ejecutarDiagnosticoIA } from '../../../core/ai/ai.service';
 import { detectarIntencionIA } from '../../../core/ai/ai.router.service';
 
 export const handleIncoming = async (req: Request, res: Response) => {
+  // LOGS INICIALES PARA DEPURACIÓN EN RENDER
+  console.log('--- ENTRADA DE WEBHOOK ---');
+  console.log('Cuerpo de la petición:', JSON.stringify(req.body, null, 2));
+
   try {
     const {
-      cedula, // Campo cedula_cliente de ManyChat
+      cedula, 
       mensaje_usuario,
       paso_diagnostico = 0,
       intentos_ips = 0,
       ultimo_fue_falla = false
     } = req.body;
 
-    console.log('[ManyChat] Mensaje recibido:', mensaje_usuario);
+    if (!mensaje_usuario) {
+      console.log('[Warn] Mensaje de usuario vacío');
+      return res.json({ ok: false, data: { mensajeIA: "No recibí ningún texto." } });
+    }
 
     // 1️⃣ Detectar intención con la IA
     const router = await detectarIntencionIA(mensaje_usuario);
@@ -54,10 +61,11 @@ export const handleIncoming = async (req: Request, res: Response) => {
       ultimoFueFalla: ultimo_fue_falla
     });
 
-    // Lógica de escalamiento (5 intentos o decisión de la IA)
+    // Lógica de escalamiento
     const limiteAlcanzado = intentos_ips >= 5 || resultadoIA.estado === 'DIAGNOSTICO_AGOTADO' || router.intencion === 'SOPORTE';
 
     if (limiteAlcanzado) {
+      console.log('[Status] Escalando a soporte humano');
       return res.json({
         ok: true,
         data: {
@@ -83,7 +91,7 @@ export const handleIncoming = async (req: Request, res: Response) => {
     });
 
   } catch (error) {
-    console.error('[ManyChat Error]', error);
+    console.error('[ManyChat Error] Detalle:', error);
     return res.status(500).json({
       ok: false,
       data: {
