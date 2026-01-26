@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { ROUTER_PROMPT } from './ai.router.prompt';
 import { RouterIAResponse } from './ai.types';
+import { limpiarMensaje } from '../utils/limpiarMensaje';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
@@ -8,7 +9,11 @@ export async function detectarIntencionIA(
   mensajeUsuario: string
 ): Promise<RouterIAResponse> {
 
-  const prompt = ROUTER_PROMPT.replace('{{mensaje_usuario}}', mensajeUsuario);
+  const mensajeLimpio = limpiarMensaje(mensajeUsuario);
+  //const prompt = ROUTER_PROMPT.replace('{{mensaje_usuario}}', mensajeUsuario);
+
+  console.log('[Router IA] mensaje limpio:', mensajeLimpio);
+  const prompt = ROUTER_PROMPT.replace('{{mensaje_usuario}}', mensajeLimpio);
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
