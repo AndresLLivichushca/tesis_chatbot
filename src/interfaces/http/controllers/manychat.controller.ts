@@ -6,7 +6,8 @@ export async function webhookManychat(req: Request, res: Response) {
     console.log('--- ENTRADA DE WEBHOOK MANYCHAT ---');
     console.log(req.body);
 
-    const { cedula, mensaje_usuario } = req.body;
+    const body = req.body || {};
+    const { cedula, mensaje_usuario } = body;
 
     console.log('[DEBUG] Cédula recibida:', cedula);
     console.log('[DEBUG] Mensaje usuario:', mensaje_usuario);
