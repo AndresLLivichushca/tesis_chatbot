@@ -6,12 +6,9 @@ export async function webhookManychat(req: Request, res: Response) {
     console.log('--- ENTRADA DE WEBHOOK MANYCHAT ---');
     console.log(req.body);
 
-    const {
-      cedula,
-      mensaje_usuario = '',
-    } = req.body;
+    const { cedula } = req.body;
 
-    // 🔴 LOG 1
+    // 🔴 LOG CLAVE
     console.log('[DEBUG] Cédula recibida:', cedula);
 
     if (!cedula) {
@@ -26,10 +23,10 @@ export async function webhookManychat(req: Request, res: Response) {
       });
     }
 
-    // 🔴 CONSULTA REAL A MAKE / ODOO
+    // 🔴 LLAMADA REAL A MAKE
     const cliente = await buscarClientePorCedula(cedula);
 
-    // 🔴 LOG MÁS IMPORTANTE DE TODO
+    // 🔴 LOG DEFINITIVO
     console.log('[DEBUG CLIENTE]', cliente);
 
     if (!cliente) {
@@ -45,7 +42,7 @@ export async function webhookManychat(req: Request, res: Response) {
       });
     }
 
-    // ✅ SI EXISTE, NO HAY DISCUSIÓN
+    // ✅ AQUÍ YA NO DEBE HABER undefined
     return res.json({
       ok: true,
       data: {
@@ -58,7 +55,6 @@ export async function webhookManychat(req: Request, res: Response) {
 
   } catch (error) {
     console.error('[ERROR WEBHOOK MANYCHAT]', error);
-
     return res.status(500).json({
       ok: false,
       error: 'Error interno del servidor',
