@@ -12,6 +12,31 @@ export async function webhookManychat(req: Request, res: Response) {
     console.log('[DEBUG] Cédula recibida:', cedula);
     console.log('[DEBUG] Mensaje usuario:', mensaje_usuario);
 
+    
+    function clasificarProblema(texto: string) {
+      const t = texto.toLowerCase();
+
+      if (t.includes('saldo') || t.includes('factura') || t.includes('deuda')) {
+        return 'SALDO';
+      }
+
+      if (
+        t.includes('internet') ||
+        t.includes('lento') ||
+        t.includes('caido') ||
+        t.includes('sin servicio')
+      ) {
+        return 'INTERNET';
+      }
+
+      return 'OTROS';
+    }
+
+    const tipoProblema = clasificarProblema(mensaje_usuario || '');
+    console.log('[DEBUG] Tipo de problema detectado:', tipoProblema);
+
+
+
     // 1️⃣ Validación de cédula
     if (!cedula) {
       return res.status(200).json({
@@ -45,8 +70,10 @@ export async function webhookManychat(req: Request, res: Response) {
         estado: 'RESPUESTA_SALDO',
         finalizar: false, // ⬅️ OJO: NO FINALIZA
         paso_diagnostico: 0,
+        tipo_problema: tipoProblema,
       });
     }
+
 
     // 4️⃣ Fallback
     return res.status(200).json({
