@@ -32,12 +32,11 @@ export async function webhookManychat(req: Request, res: Response) {
     }
 
     return res.status(200).json({
-      mensajeIA: '🧪 TEST BACKEND OK - MENSAJE DESDE API',
+      mensajeIA: `Hola ${cliente.nombre}. Tu saldo pendiente es $${cliente.saldo}.`,
       estado: 'FINALIZAR',
       finalizar: true,
       paso_diagnostico: 0,
     });
-
 
   } catch (error) {
     console.error('[ERROR WEBHOOK MANYCHAT]', error);
