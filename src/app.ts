@@ -30,7 +30,11 @@ export const createApp = () => {
 
   app.use((err: any, _req: any, res: any, _next: any) => {
     console.error('[ERROR]', err);
-    res.status(err?.status || 500).json({ error: err?.message || 'Server error' });
+    res.status(err?.status || 500).json({
+      mensajeIA: 'Error interno del servidor',
+      estado: 'ERROR',
+      finalizar: false,
+    });
   });
 
   return app;

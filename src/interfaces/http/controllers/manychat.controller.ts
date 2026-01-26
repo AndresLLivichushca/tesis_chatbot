@@ -6,9 +6,12 @@ export async function webhookManychat(req: Request, res: Response) {
     console.log('--- ENTRADA DE WEBHOOK MANYCHAT ---');
     console.log(req.body);
 
-    const { cedula } = req.body;
-    console.log('[DEBUG] Cédula recibida:', cedula);
+    const { cedula, mensaje_usuario } = req.body;
 
+    console.log('[DEBUG] Cédula recibida:', cedula);
+    console.log('[DEBUG] Mensaje usuario:', mensaje_usuario);
+
+    // 1️⃣ Validación de cédula
     if (!cedula) {
       return res.status(200).json({
         mensajeIA: 'Por favor envíame tu número de cédula.',
@@ -18,23 +21,38 @@ export async function webhookManychat(req: Request, res: Response) {
       });
     }
 
+    // 2️⃣ Buscar cliente
     const cliente = await buscarClientePorCedula(cedula);
     console.log('[DEBUG CLIENTE]', cliente);
 
     if (!cliente) {
       return res.status(200).json({
         mensajeIA:
-          'Hola Cliente No Registrado 🙌. No tienes deudas pendientes. Tu servicio está desconocido.',
-        estado: 'FINALIZAR',
-        finalizar: true,
+          '❌ No encontré información asociada a esa cédula. Verifícala e inténtalo nuevamente.',
+        estado: 'CEDULA_NO_ENCONTRADA',
+        finalizar: false,
         paso_diagnostico: 0,
       });
     }
 
+    // 3️⃣ Clasificación SIMPLE de intención (PASO 6 empieza aquí)
+    const texto = (mensaje_usuario || '').toLowerCase();
+
+    if (texto.includes('saldo') || texto.includes('deuda') || texto.includes('factura')) {
+      return res.status(200).json({
+        mensajeIA: `Hola ${cliente.nombre}. Tu saldo pendiente es $${cliente.saldo}.`,
+        estado: 'RESPUESTA_SALDO',
+        finalizar: false, // ⬅️ OJO: NO FINALIZA
+        paso_diagnostico: 0,
+      });
+    }
+
+    // 4️⃣ Fallback
     return res.status(200).json({
-      mensajeIA: `Hola ${cliente.nombre}. Tu saldo pendiente es $${cliente.saldo}.`,
-      estado: 'FINALIZAR',
-      finalizar: true,
+      mensajeIA:
+        'Puedo ayudarte con consultas de saldo, facturas o problemas de internet. ¿En qué te ayudo?',
+      estado: 'NO_ENTENDIDO',
+      finalizar: false,
       paso_diagnostico: 0,
     });
 
@@ -43,7 +61,7 @@ export async function webhookManychat(req: Request, res: Response) {
     return res.status(500).json({
       mensajeIA: 'Error interno del servidor',
       estado: 'ERROR',
-      finalizar: true,
+      finalizar: false,
     });
   }
 }
