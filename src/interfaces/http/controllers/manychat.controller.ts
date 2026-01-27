@@ -3,7 +3,7 @@
 import { Request, Response } from 'express';
 import { AIService } from '../../../core/ai/ai.service';
 
-export const manychatWebhook = async (
+export const webhookManychat = async (
   req: Request,
   res: Response
 ) => {
