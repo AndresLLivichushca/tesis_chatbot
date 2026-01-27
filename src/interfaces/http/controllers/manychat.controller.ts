@@ -1,63 +1,141 @@
-// src/controllers/manychat.controller.ts
-
 import { Request, Response } from 'express';
+import { buscarClientePorCedula } from '../../../core/services/cliente.service';
 import { AIService } from '../../../core/ai/ai.service';
 
-export const webhookManychat = async (
-  req: Request,
-  res: Response
-) => {
+/**
+ * Clasificación del problema (BACKEND decide, NO ManyChat)
+ */
+function clasificarProblema(texto: string): 'SALDO' | 'INTERNET' | 'OTRO' {
+  const t = texto.toLowerCase();
+
+  if (
+    t.includes('saldo') ||
+    t.includes('factura') ||
+    t.includes('deuda') ||
+    t.includes('pagar')
+  ) {
+    return 'SALDO';
+  }
+
+  if (
+    t.includes('internet') ||
+    t.includes('lento') ||
+    t.includes('no tengo') ||
+    t.includes('sin servicio') ||
+    t.includes('caido')
+  ) {
+    return 'INTERNET';
+  }
+
+  return 'OTRO';
+}
+
+export const webhookManychat = async (req: Request, res: Response) => {
   try {
-    // 🔐 Seguridad básica
+    // 🔐 Seguridad
     const secret = req.headers['x-webhook-secret'];
     if (secret !== process.env.MANYCHAT_WEBHOOK_SECRET) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // 📥 Datos desde ManyChat
+    console.log('--- WEBHOOK MANYCHAT ---');
+    console.log('[BODY]', req.body);
+
     const {
       cedula,
       mensaje_usuario,
       intentos_soporte = 0,
-      tipo_problema,
     } = req.body;
-console.log('[MANYCHAT BODY]', req.body);
 
     if (!mensaje_usuario) {
       return res.json({
-        mensajeIA: 'No recibí el mensaje del usuario.',
+        mensajeIA: 'No recibí tu mensaje, ¿puedes repetirlo?',
         estado: 'SEGUIR',
         finalizar: false,
-        paso_diagnostico: 1,
+        paso_diagnostico: 0,
         tipo_problema: 'OTRO',
       });
     }
-console.log('[CEDULA]', cedula);
-console.log('[MENSAJE]', mensaje_usuario);
 
-    // 🤖 Llamada a la IA
-    const iaResponse = await AIService.procesarMensaje({
-      mensaje_usuario,
-      intentos_soporte,
-      tipo_problema,
-    });
+    console.log('[CEDULA]', cedula);
+    console.log('[MENSAJE]', mensaje_usuario);
 
-    // 📤 RESPUESTA A MANYCHAT (CLAVE)
+    // 🔎 Clasificación REAL
+    const tipoDetectado = clasificarProblema(mensaje_usuario);
+    console.log('[TIPO DETECTADO]', tipoDetectado);
+
+    // 1️⃣ Validar cédula
+    if (!cedula) {
+      return res.json({
+        mensajeIA: 'Por favor envíame tu número de cédula para continuar.',
+        estado: 'PEDIR_CEDULA',
+        finalizar: false,
+        paso_diagnostico: 0,
+        tipo_problema: 'OTRO',
+      });
+    }
+
+    // 2️⃣ Buscar cliente
+    const cliente = await buscarClientePorCedula(cedula);
+    console.log('[CLIENTE]', cliente);
+
+    if (!cliente) {
+      return res.json({
+        mensajeIA:
+          '❌ No encontré información asociada a esa cédula. Verifícala e inténtalo nuevamente.',
+        estado: 'CEDULA_NO_ENCONTRADA',
+        finalizar: false,
+        paso_diagnostico: 0,
+        tipo_problema: 'OTRO',
+      });
+    }
+
+    // ==========================
+    // 💰 CASO SALDO (CERRADO)
+    // ==========================
+    if (tipoDetectado === 'SALDO') {
+      return res.json({
+        mensajeIA: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
+        estado: 'RESPUESTA_SALDO',
+        finalizar: false, // 👈 IMPORTANTE (ManyChat sigue)
+        paso_diagnostico: 0,
+        tipo_problema: 'SALDO',
+      });
+    }
+
+    // ==========================
+    // 🌐 INTERNET (POR AHORA SIMPLE)
+    // ==========================
+    if (tipoDetectado === 'INTERNET') {
+      return res.json({
+        mensajeIA:
+          'Entiendo que tienes un problema con tu servicio de internet 📡 ¿Tu modem está encendido?',
+        estado: 'DIAGNOSTICO_INTERNET_1',
+        finalizar: false,
+        paso_diagnostico: 1,
+        tipo_problema: 'INTERNET',
+      });
+    }
+
+    // ==========================
+    // ❓ FALLBACK
+    // ==========================
     return res.json({
-      mensajeIA: iaResponse.mensajeIA,
-      estado: iaResponse.estado,
-      finalizar: iaResponse.finalizar,
-      paso_diagnostico: iaResponse.paso_diagnostico,
-      tipo_problema: iaResponse.tipo_problema,
+      mensajeIA:
+        'Puedo ayudarte con consultas de saldo, facturas o problemas de internet. ¿En qué te ayudo?',
+      estado: 'NO_ENTENDIDO',
+      finalizar: false,
+      paso_diagnostico: 0,
+      tipo_problema: 'OTRO',
     });
-  } catch (error) {
-    console.error('Error webhook ManyChat:', error);
 
-    // 🧯 Fallback seguro
+  } catch (error) {
+    console.error('[ERROR WEBHOOK MANYCHAT]', error);
+
     return res.json({
       mensajeIA:
         'Ocurrió un error inesperado. Te derivaré con un agente.',
-      estado: 'ESCALAR',
+      estado: 'ERROR',
       finalizar: true,
       paso_diagnostico: 0,
       tipo_problema: 'OTRO',
