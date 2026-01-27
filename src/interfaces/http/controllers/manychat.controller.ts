@@ -96,6 +96,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
     if (tipoDetectado === 'SALDO') {
       return res.json({
         mensajeIA: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
+        nombre: cliente.nombre,
         estado: 'RESPUESTA_SALDO',
         finalizar: false, // 👈 IMPORTANTE (ManyChat sigue)
         paso_diagnostico: 0,

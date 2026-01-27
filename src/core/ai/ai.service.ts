@@ -1,3 +1,5 @@
+// src/core/ai/ai.service.ts
+
 import OpenAI from 'openai';
 import { buildInternetPrompt } from './ai.prompt';
 
@@ -8,15 +10,12 @@ const openai = new OpenAI({
 export interface IARequestData {
   mensaje_usuario: string;
   intentos_soporte: number;
-  tipo_problema?: string;
 }
 
 export interface IAResponseData {
   mensajeIA: string;
-  tipo_problema: 'INTERNET' | 'SALDO' | 'OTRO';
   estado: 'SEGUIR' | 'ESCALAR';
   finalizar: boolean;
-  paso_diagnostico: number;
 }
 
 export class AIService {
@@ -33,53 +32,35 @@ export class AIService {
         model: 'gpt-4o-mini',
         temperature: 0.3,
         messages: [
-          {
-            role: 'system',
-            content: prompt.system,
-          },
-          {
-            role: 'user',
-            content: prompt.user,
-          },
+          { role: 'system', content: prompt.system },
+          { role: 'user', content: prompt.user },
         ],
       });
 
-      const rawContent =
-        completion.choices[0]?.message?.content ?? '';
+      const raw = completion.choices[0]?.message?.content ?? '';
 
-      // 🛡️ Asegurar JSON válido
-      const jsonStart = rawContent.indexOf('{');
-      const jsonEnd = rawContent.lastIndexOf('}');
+      const jsonStart = raw.indexOf('{');
+      const jsonEnd = raw.lastIndexOf('}');
 
       if (jsonStart === -1 || jsonEnd === -1) {
-        throw new Error('Respuesta IA no es JSON válido');
+        throw new Error('IA no devolvió JSON válido');
       }
 
-      const jsonString = rawContent.substring(
-        jsonStart,
-        jsonEnd + 1
-      );
-
-      const parsed = JSON.parse(jsonString);
+      const parsed = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
 
       return {
-        mensajeIA: parsed.mensajeIA ?? 'Estamos revisando tu caso.',
-        tipo_problema: parsed.tipo_problema ?? 'OTRO',
-        estado: parsed.estado ?? 'SEGUIR',
+        mensajeIA: parsed.mensajeIA ?? 'Estoy revisando tu problema.',
+        estado: parsed.estado === 'ESCALAR' ? 'ESCALAR' : 'SEGUIR',
         finalizar: Boolean(parsed.finalizar),
-        paso_diagnostico: Number(parsed.paso_diagnostico ?? 1),
       };
     } catch (error) {
-      console.error('Error IA:', error);
+      console.error('[AI INTERNET ERROR]', error);
 
-      // 🔴 Fallback que NUNCA rompe ManyChat
       return {
         mensajeIA:
-          'No pude analizar tu problema en este momento. Te derivaré con un agente técnico.',
-        tipo_problema: 'OTRO',
+          'No pude resolver el problema automáticamente. Te derivaré con un agente técnico.',
         estado: 'ESCALAR',
         finalizar: true,
-        paso_diagnostico: 0,
       };
     }
   }
