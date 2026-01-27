@@ -21,6 +21,7 @@ export const webhookManychat = async (
       intentos_soporte = 0,
       tipo_problema,
     } = req.body;
+console.log('[MANYCHAT BODY]', req.body);
 
     if (!mensaje_usuario) {
       return res.json({
@@ -31,6 +32,8 @@ export const webhookManychat = async (
         tipo_problema: 'OTRO',
       });
     }
+console.log('[CEDULA]', cedula);
+console.log('[MENSAJE]', mensaje_usuario);
 
     // 🤖 Llamada a la IA
     const iaResponse = await AIService.procesarMensaje({
