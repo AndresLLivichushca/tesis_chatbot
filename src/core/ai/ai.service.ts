@@ -1,7 +1,5 @@
-// src/ai/ai.service.ts
-
 import OpenAI from 'openai';
-import { SYSTEM_PROMPT, buildUserPrompt } from './ai.prompt';
+import { buildInternetPrompt } from './ai.prompt';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -26,17 +24,22 @@ export class AIService {
     data: IARequestData
   ): Promise<IAResponseData> {
     try {
+      const prompt = buildInternetPrompt({
+        mensaje_usuario: data.mensaje_usuario,
+        intentos_soporte: data.intentos_soporte,
+      });
+
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         temperature: 0.3,
         messages: [
           {
             role: 'system',
-            content: SYSTEM_PROMPT,
+            content: prompt.system,
           },
           {
             role: 'user',
-            content: buildUserPrompt(data),
+            content: prompt.user,
           },
         ],
       });
@@ -44,7 +47,7 @@ export class AIService {
       const rawContent =
         completion.choices[0]?.message?.content ?? '';
 
-      // 🛡️ Protección: asegurar JSON válido
+      // 🛡️ Asegurar JSON válido
       const jsonStart = rawContent.indexOf('{');
       const jsonEnd = rawContent.lastIndexOf('}');
 
@@ -57,9 +60,8 @@ export class AIService {
         jsonEnd + 1
       );
 
-      const parsed: IAResponseData = JSON.parse(jsonString);
+      const parsed = JSON.parse(jsonString);
 
-      // 🧹 Normalización defensiva
       return {
         mensajeIA: parsed.mensajeIA ?? 'Estamos revisando tu caso.',
         tipo_problema: parsed.tipo_problema ?? 'OTRO',
@@ -70,7 +72,7 @@ export class AIService {
     } catch (error) {
       console.error('Error IA:', error);
 
-      // 🔴 Fallback seguro (NUNCA rompe ManyChat)
+      // 🔴 Fallback que NUNCA rompe ManyChat
       return {
         mensajeIA:
           'No pude analizar tu problema en este momento. Te derivaré con un agente técnico.',
