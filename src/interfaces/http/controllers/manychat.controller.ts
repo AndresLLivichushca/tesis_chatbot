@@ -104,19 +104,24 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // ==========================
-    // 🌐 INTERNET (POR AHORA SIMPLE)
-    // ==========================
-    if (tipoDetectado === 'INTERNET') {
-      return res.json({
-        mensajeIA:
-          'Entiendo que tienes un problema con tu servicio de internet 📡 ¿Tu modem está encendido?',
-        estado: 'DIAGNOSTICO_INTERNET_1',
-        finalizar: false,
-        paso_diagnostico: 1,
-        tipo_problema: 'INTERNET',
-      });
-    }
+   
+// 🌐 INTERNET (IA REAL)
+// ==========================
+      if (tipoDetectado === 'INTERNET') {
+
+        const iaResponse = await AIService.procesarMensaje({
+          mensaje_usuario,
+          intentos_soporte,
+        });
+
+        return res.json({
+          mensajeIA: iaResponse.mensajeIA,
+          estado: iaResponse.estado,        // SEGUIR | ESCALAR
+          finalizar: iaResponse.finalizar,  // true | false
+          tipo_problema: 'INTERNET',
+        });
+      }
+
 
     // ==========================
     // ❓ FALLBACK
