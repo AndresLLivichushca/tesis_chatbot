@@ -1,31 +1,52 @@
+// src/ai/ai.service.ts
+
 import OpenAI from 'openai';
-import { ROUTER_PROMPT } from './ai.router.prompt';
-import { RouterIAResponse } from './ai.types';
-import { limpiarMensaje } from '../utils/limpiarMensaje';
+import { buildInternetPrompt } from './ai.prompt';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-export async function detectarIntencionIA(
-  mensajeUsuario: string
-): Promise<RouterIAResponse> {
+export class AIService {
+  static async procesarMensaje({
+    mensaje_usuario,
+    intentos_soporte,
+  }: {
+    mensaje_usuario: string;
+    intentos_soporte: number;
+    tipo_problema?: string;
+  }) {
+    const prompt = buildInternetPrompt({
+      mensaje_usuario,
+      intentos_soporte,
+    });
 
-  const mensajeLimpio = limpiarMensaje(mensajeUsuario);
-  //const prompt = ROUTER_PROMPT.replace('{{mensaje_usuario}}', mensajeUsuario);
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Eres un asistente técnico experto en soporte de internet.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.4,
+    });
 
-  console.log('[Router IA] mensaje limpio:', mensajeLimpio);
-  const prompt = ROUTER_PROMPT.replace('{{mensaje_usuario}}', mensajeLimpio);
+    const raw = completion.choices[0].message?.content || '{}';
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    temperature: 0,
-    messages: [{ role: 'system', content: prompt }]
-  });
+    // 🧠 Parse seguro
+    const parsed = JSON.parse(raw);
 
-  const raw = completion.choices[0].message.content;
-
-  try {
-    return JSON.parse(raw || '');
-  } catch {
-    return { intencion: 'GENERAL', finalizar: false };
+    return {
+      mensajeIA: parsed.mensajeIA,
+      tipo_problema: parsed.tipo_problema,
+      estado: parsed.estado,
+      finalizar: parsed.finalizar,
+      paso_diagnostico: parsed.paso_diagnostico,
+    };
   }
 }
