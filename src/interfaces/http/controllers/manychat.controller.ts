@@ -108,7 +108,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
       if (intentos === 0) {
         return res.json({
           respuesta_ia_ips:
-            '🔌 Por favor reinicia tu router desconectándolo por 30 segundos y vuelve a conectarlo.\n\n¿El servicio ya funciona?',
+            '🔌 Por favor reinicia tu router desconectándolo por 30 segundos y vuelve a conectarlo.',
           estado: 'PASO_1',
           finalizar: false,
           tipo_problema: 'INTERNET',
