@@ -83,13 +83,16 @@ export const webhookManychat = async (req: Request, res: Response) => {
     console.log('[CLIENTE]', cliente);
 
     if (!cliente) {
-      return res.json({
-        respuesta_ia_ips: '❌ No encontré un cliente con esa cédula.',
-        estado: 'CEDULA_NO_ENCONTRADA',
-        finalizar: false,
-        tipo_problema: 'OTRO',
-      });
-    }
+  return res.json({
+    respuesta_ia_ips:
+      '❌ Cliente no registrado.\n\nNo encontramos información asociada a esta cédula. ' +
+      'Por favor revisa tu contrato o acércate a uno de nuestros centros de atención al cliente.',
+    estado: 'CLIENTE_NO_REGISTRADO',
+    finalizar: true, // 🔴 CLAVE
+    tipo_problema: 'OTRO',
+  });
+}
+
 
     // 💰 FLUJO SALDO (YA FUNCIONA)
     if (tipoDetectado === 'SALDO') {
