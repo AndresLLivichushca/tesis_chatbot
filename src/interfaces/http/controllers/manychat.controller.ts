@@ -6,12 +6,8 @@ type TipoProblema = 'SALDO' | 'INTERNET' | 'OTRO';
 function clasificarProblema(texto: string): TipoProblema {
   const t = texto.toLowerCase();
 
-  if (
-    t.includes('saldo') ||
-    t.includes('factura') ||
-    t.includes('deuda') ||
-    t.includes('pagar')
-  ) return 'SALDO';
+  if (t.includes('saldo') || t.includes('factura') || t.includes('deuda') || t.includes('pagar'))
+    return 'SALDO';
 
   if (
     t.includes('internet') ||
@@ -22,29 +18,20 @@ function clasificarProblema(texto: string): TipoProblema {
     t.includes('no funciona')
   ) return 'INTERNET';
 
-  if (
-    t.includes('fecha') ||
-    t.includes('vencimiento')
-  ) return 'SALDO';
-
   return 'OTRO';
 }
 
-function obtenerFechaVencimiento(contratos: any[]): string | null {
-  for (const contrato of contratos) {
-    if (Array.isArray(contrato.facturas) && contrato.facturas.length > 0) {
+function obtenerFechaVencimiento(cliente: any): string {
+  for (const contrato of cliente.contratos || []) {
+    if (contrato.facturas && contrato.facturas.length > 0) {
       return contrato.facturas[0].fechaemision;
     }
   }
-  return null;
+  return 'NO_REGISTRADA';
 }
 
 export const webhookManychat = async (req: Request, res: Response) => {
   try {
-    console.log('--- MANYCHAT WEBHOOK ---');
-    console.log('[BODY]', req.body);
-
-    // 🔐 Seguridad
     const secret = req.headers['x-webhook-secret'];
     if (secret !== process.env.MANYCHAT_WEBHOOK_SECRET) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -69,75 +56,49 @@ export const webhookManychat = async (req: Request, res: Response) => {
         estado: 'PEDIR_CEDULA',
         cliente_existe: null,
         nombre_cliente: null,
+        fecha_vencimiento: null,
         intentos_soporte: 0,
         finalizar: false,
       });
     }
 
-    // 2️⃣ Validación dura de cliente
     const cliente = await buscarClientePorCedula(cedula);
 
     if (!cliente) {
       return res.json({
         respuesta_ia_ips:
-          '❌ Cliente no registrado.\n\n' +
-          'No encontramos información asociada a esta cédula.\n' +
-          'Por favor revisa tu contrato o acércate a un centro de atención.',
+          '❌ Cliente no registrado.\n\nNo encontramos información asociada a esta cédula.',
         estado: 'CLIENTE_NO_REGISTRADO',
         cliente_existe: false,
         nombre_cliente: null,
+        fecha_vencimiento: null,
         intentos_soporte: 0,
         finalizar: true,
       });
     }
 
-    // 🧱 BASE CLIENTE
+    const fechaVencimiento = obtenerFechaVencimiento(cliente);
+
     const baseCliente = {
       cliente_existe: true,
       nombre_cliente: cliente.nombre,
+      fecha_vencimiento: fechaVencimiento,
       intentos_soporte: intentos,
     };
 
-    // 3️⃣ Detectar tipo problema
-    const esPlaceholder =
-      typeof tipo_problema === 'string' && tipo_problema.includes('{{');
-
-    const tipoDetectado: TipoProblema =
-      tipo_problema && !esPlaceholder && tipo_problema !== 'OTRO'
+    const tipoDetectado =
+      tipo_problema && tipo_problema !== 'OTRO'
         ? tipo_problema
         : clasificarProblema(mensaje);
 
-    // 💰 SALDO / FECHA
+    // 💰 SALDO
     if (tipoDetectado === 'SALDO') {
-      const fechaVencimiento = obtenerFechaVencimiento(cliente.contratos || []);
-
-      if (mensaje.toLowerCase().includes('fecha')) {
-  const fechaVencimiento = obtenerFechaVencimiento(cliente.contratos || []);
-
-  if (!fechaVencimiento) {
-    return res.json({
-      ...baseCliente,
-      fecha_vencimiento: '📄 No tienes una fecha de vencimiento registrada actualmente.',
-      estado: 'SIN_FECHA_VENCIMIENTO',
-      finalizar: true,
-    });
-  }
-
-  return res.json({
-    ...baseCliente,
-    fecha_vencimiento: `📅 Tu fecha de vencimiento es ${fechaVencimiento}`,
-    estado: 'FECHA_VENCIMIENTO',
-    finalizar: true,
-  });
-}
-
-
       return res.json({
         ...baseCliente,
         respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es de $${cliente.saldo}.`,
         estado: 'RESPUESTA_SALDO',
         tipo_problema: 'SALDO',
-        finalizar: true,
+        finalizar: false,
       });
     }
 
@@ -146,23 +107,10 @@ export const webhookManychat = async (req: Request, res: Response) => {
       if (intentos === 0) {
         return res.json({
           ...baseCliente,
-          respuesta_ia_ips:
-            '🔌 Reinicia tu router desconectándolo por 30 segundos.',
+          respuesta_ia_ips: '🔌 Reinicia tu router desconectándolo por 30 segundos.',
           estado: 'PASO_1',
           tipo_problema: 'INTERNET',
           intentos_soporte: 1,
-          finalizar: false,
-        });
-      }
-
-      if (resultado_paso === 'NO' && intentos === 1) {
-        return res.json({
-          ...baseCliente,
-          respuesta_ia_ips:
-            '📶 Verifica que las luces del router estén encendidas.',
-          estado: 'PASO_2',
-          tipo_problema: 'INTERNET',
-          intentos_soporte: 2,
           finalizar: false,
         });
       }
@@ -176,33 +124,23 @@ export const webhookManychat = async (req: Request, res: Response) => {
           finalizar: true,
         });
       }
-
-      return res.json({
-        ...baseCliente,
-        respuesta_ia_ips:
-          '❗ No se pudo resolver automáticamente. Un agente te contactará.',
-        estado: 'ESCALAR',
-        tipo_problema: 'INTERNET',
-        finalizar: true,
-      });
     }
 
-    // ❓ NO ENTENDIDO
     return res.json({
       ...baseCliente,
-      respuesta_ia_ips:
-        'Puedo ayudarte con consultar tu saldo o con problemas de internet.',
+      respuesta_ia_ips: 'Puedo ayudarte con saldo o problemas de internet.',
       estado: 'NO_ENTENDIDO',
       finalizar: false,
     });
 
   } catch (error) {
-    console.error('[ERROR MANYCHAT]', error);
+    console.error(error);
     return res.json({
-      respuesta_ia_ips: 'Ocurrió un error. Te derivaré con un agente.',
+      respuesta_ia_ips: 'Ocurrió un error. Un agente te contactará.',
       estado: 'ERROR',
       cliente_existe: true,
       nombre_cliente: null,
+      fecha_vencimiento: null,
       intentos_soporte: 0,
       finalizar: true,
     });
