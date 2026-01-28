@@ -38,36 +38,37 @@ export const webhookManychat = async (req: Request, res: Response) => {
       mensaje_usuario,
       tipo_problema,
       intentos_soporte = 0,
+      resultado_paso,
     } = req.body;
 
-    if (!mensaje_usuario) {
-      console.warn('[WARN] mensaje_usuario vacío');
+    const intentos = Number(intentos_soporte) || 0;
+
+    // 1️⃣ Mensaje vacío
+    if (!mensaje_usuario && !resultado_paso) {
       return res.json({
         respuesta_ia_ips: 'No recibí tu mensaje, ¿puedes repetirlo?',
         estado: 'SEGUIR',
         finalizar: false,
-        tipo_problema: tipo_problema ?? 'OTRO',
+        tipo_problema: 'OTRO',
       });
     }
 
+    // 2️⃣ Detectar tipo problema
     const esPlaceholderManychat =
-  typeof tipo_problema === 'string' &&
-  tipo_problema.includes('{{');
+      typeof tipo_problema === 'string' &&
+      tipo_problema.includes('{{');
 
-let tipoDetectado: 'SALDO' | 'INTERNET' | 'OTRO';
+    let tipoDetectado: 'SALDO' | 'INTERNET' | 'OTRO';
 
-if (
-  tipo_problema &&
-  !esPlaceholderManychat &&
-  tipo_problema !== 'OTRO'
-) {
-  tipoDetectado = tipo_problema;
-} else {
-  tipoDetectado = clasificarProblema(mensaje_usuario);
-}
+    if (tipo_problema && !esPlaceholderManychat && tipo_problema !== 'OTRO') {
+      tipoDetectado = tipo_problema;
+    } else {
+      tipoDetectado = clasificarProblema(mensaje_usuario ?? '');
+    }
 
-console.log('[TIPO FINAL]', tipoDetectado);
+    console.log('[TIPO FINAL]', tipoDetectado);
 
+    // 3️⃣ Validar cédula
     if (!cedula) {
       return res.json({
         respuesta_ia_ips: 'Por favor envíame tu número de cédula.',
@@ -89,7 +90,7 @@ console.log('[TIPO FINAL]', tipoDetectado);
       });
     }
 
-    // 💰 SALDO (INTOCABLE)
+    // 💰 SALDO (NO SE TOCA)
     if (tipoDetectado === 'SALDO') {
       return res.json({
         respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
@@ -101,17 +102,44 @@ console.log('[TIPO FINAL]', tipoDetectado);
 
     // 🌐 INTERNET
     if (tipoDetectado === 'INTERNET') {
-      const ia = await AIService.procesarMensaje({
-        mensaje_usuario,
-        intentos_soporte: Number(intentos_soporte) || 0,
+
+      // ✅ Si el usuario dijo SI → cerrar
+      if (resultado_paso === 'SI') {
+        return res.json({
+          respuesta_ia_ips: '¡Excelente! Me alegra que ya esté funcionando 😊',
+          estado: 'RESUELTO',
+          finalizar: true,
+          tipo_problema: 'INTERNET',
+        });
+      }
+
+      // ✅ Mensaje para IA
+      const mensajeParaIA =
+        resultado_paso === 'NO'
+          ? 'El paso anterior no funcionó'
+          : mensaje_usuario;
+
+      console.log('[AI INPUT]', {
+        mensaje_usuario: mensajeParaIA,
+        intentos_soporte: intentos,
       });
 
+      const ia = await AIService.procesarMensaje({
+        mensaje_usuario: mensajeParaIA,
+        intentos_soporte: intentos,
+      });
+
+      console.log('[AI OUTPUT]', ia);
+
       return res.json({
-        ...ia,
+        respuesta_ia_ips: ia.respuesta_ia_ips,
+        estado: ia.estado,
+        finalizar: ia.finalizar,
         tipo_problema: 'INTERNET',
       });
     }
 
+    // ❓ Fallback
     return res.json({
       respuesta_ia_ips:
         'Puedo ayudarte con saldo o problemas de internet. ¿Qué deseas consultar?',
@@ -119,6 +147,7 @@ console.log('[TIPO FINAL]', tipoDetectado);
       finalizar: false,
       tipo_problema: 'OTRO',
     });
+
   } catch (error) {
     console.error('[ERROR MANYCHAT]', error);
 
