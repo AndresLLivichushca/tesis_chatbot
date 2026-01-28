@@ -50,12 +50,23 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    let tipoDetectado =
-      tipo_problema && tipo_problema !== 'OTRO'
-        ? tipo_problema
-        : clasificarProblema(mensaje_usuario);
+    const esPlaceholderManychat =
+  typeof tipo_problema === 'string' &&
+  tipo_problema.includes('{{');
 
-    console.log('[TIPO DETECTADO]', tipoDetectado);
+let tipoDetectado: 'SALDO' | 'INTERNET' | 'OTRO';
+
+if (
+  tipo_problema &&
+  !esPlaceholderManychat &&
+  tipo_problema !== 'OTRO'
+) {
+  tipoDetectado = tipo_problema;
+} else {
+  tipoDetectado = clasificarProblema(mensaje_usuario);
+}
+
+console.log('[TIPO FINAL]', tipoDetectado);
 
     if (!cedula) {
       return res.json({
