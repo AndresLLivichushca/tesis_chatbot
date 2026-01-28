@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import { buscarClientePorCedula } from '../../../core/services/cliente.service';
 
-function clasificarProblema(texto: string): 'SALDO' | 'INTERNET' | 'OTRO' {
+type TipoProblema = 'SALDO' | 'INTERNET' | 'OTRO';
+
+function clasificarProblema(texto: string): TipoProblema {
   const t = texto.toLowerCase();
 
   if (
@@ -28,6 +30,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
     console.log('--- MANYCHAT WEBHOOK ---');
     console.log('[BODY]', req.body);
 
+    // 🔐 Seguridad
     const secret = req.headers['x-webhook-secret'];
     if (secret !== process.env.MANYCHAT_WEBHOOK_SECRET) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -45,7 +48,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
     const mensaje = mensaje_usuario || problema_cliente || '';
     const intentos = Number(intentos_soporte) || 0;
 
-    // 1️⃣ Pedir cédula si no existe
+    // 1️⃣ Pedir cédula
     if (!cedula) {
       return res.json({
         respuesta_ia_ips: 'Por favor envíame tu número de cédula.',
@@ -54,7 +57,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // 2️⃣ Validar cliente (BLOQUE AUTORITARIO)
+    // 2️⃣ Validar cliente (CORTE DURO)
     const cliente = await buscarClientePorCedula(cedula);
     console.log('[CLIENTE]', cliente);
 
@@ -70,11 +73,11 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // 3️⃣ Detectar tipo de problema (SOLO SI EL CLIENTE EXISTE)
+    // 3️⃣ Detectar tipo de problema (solo cliente válido)
     const esPlaceholderManychat =
       typeof tipo_problema === 'string' && tipo_problema.includes('{{');
 
-    let tipoDetectado: 'SALDO' | 'INTERNET' | 'OTRO';
+    let tipoDetectado: TipoProblema;
 
     if (tipo_problema && !esPlaceholderManychat && tipo_problema !== 'OTRO') {
       tipoDetectado = tipo_problema;
@@ -84,7 +87,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
     console.log('[TIPO DETECTADO]', tipoDetectado);
 
-    // 💰 SALDO
+    // 💰 FLUJO SALDO
     if (tipoDetectado === 'SALDO') {
       return res.json({
         respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es de $${cliente.saldo}.`,
@@ -94,7 +97,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // 🌐 INTERNET
+    // 🌐 FLUJO INTERNET
     if (tipoDetectado === 'INTERNET') {
 
       if (intentos === 0) {
@@ -137,7 +140,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // ❓ Fallback
+    // ❓ NO ENTENDIDO
     return res.json({
       respuesta_ia_ips:
         'Puedo ayudarte con consultar tu saldo o con problemas de internet. ¿Qué deseas hacer?',
