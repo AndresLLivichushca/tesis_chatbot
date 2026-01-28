@@ -49,9 +49,12 @@ export class AIService {
       const parsed = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
 
       return {
-        respuesta_ia_ips: parsed.respuesta_ia_ips ?? 'Estoy revisando tu problema.',
+        respuesta_ia_ips:
+          parsed.respuesta_ia_ips ??
+          'Estoy revisando tu problema, intenta este paso.',
         estado: parsed.estado === 'ESCALAR' ? 'ESCALAR' : 'SEGUIR',
-        finalizar: Boolean(parsed.finalizar),
+        finalizar:
+          parsed.estado === 'ESCALAR' ? true : Boolean(parsed.finalizar),
       };
     } catch (error) {
       console.error('[AI INTERNET ERROR]', error);
