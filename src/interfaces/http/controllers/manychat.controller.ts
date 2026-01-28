@@ -42,7 +42,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
     } = req.body;
 
     const intentos = Number(intentos_soporte) || 0;
-
+    
     // 1️⃣ Mensaje vacío
     if (!mensaje_usuario && !resultado_paso) {
       return res.json({
@@ -136,6 +136,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
         estado: ia.estado,
         finalizar: ia.finalizar,
         tipo_problema: 'INTERNET',
+        intentos_soporte: intentos + 1
       });
     }
 
