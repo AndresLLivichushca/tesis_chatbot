@@ -47,6 +47,8 @@ export const webhookManychat = async (req: Request, res: Response) => {
       intentos_soporte = 0,
     } = req.body;
 
+    const intentos = Number(intentos_soporte) || 0;
+
     if (!mensaje_usuario) {
       return res.json({
         mensajeIA: 'No recibí tu mensaje, ¿puedes repetirlo?',
@@ -113,7 +115,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
         const iaResponse = await AIService.procesarMensaje({
           mensaje_usuario,
-          intentos_soporte,
+          intentos_soporte: intentos,
         });
 
         return res.json({
