@@ -63,8 +63,14 @@ export const webhookManychat = async (req: Request, res: Response) => {
     console.log('[MENSAJE]', mensaje_usuario);
 
     // 🔎 Clasificación REAL
-    const tipoDetectado =
-    req.body.tipo_problema || clasificarProblema(mensaje_usuario);
+   let tipoDetectado: 'SALDO' | 'INTERNET' | 'OTRO';
+
+if (req.body.tipo_problema && req.body.tipo_problema !== 'OTRO') {
+  tipoDetectado = req.body.tipo_problema;
+} else {
+  tipoDetectado = clasificarProblema(mensaje_usuario);
+}
+
 
     console.log('[TIPO DETECTADO]', tipoDetectado);
 
