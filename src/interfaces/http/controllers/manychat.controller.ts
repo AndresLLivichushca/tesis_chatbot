@@ -112,24 +112,25 @@ export const webhookManychat = async (req: Request, res: Response) => {
       const fechaVencimiento = obtenerFechaVencimiento(cliente.contratos || []);
 
       if (mensaje.toLowerCase().includes('fecha')) {
-        if (!fechaVencimiento) {
-          return res.json({
-            ...baseCliente,
-            respuesta_ia_ips:
-              '📄 Actualmente no se registra una fecha de vencimiento activa.\n\n' +
-              'Esto puede deberse a que no tienes facturas pendientes.',
-            estado: 'SIN_FECHA_VENCIMIENTO',
-            finalizar: true,
-          });
-        }
+  const fechaVencimiento = obtenerFechaVencimiento(cliente.contratos || []);
 
-        return res.json({
-          ...baseCliente,
-          fecha_vencimiento: fechaVencimiento, // 👈 CLAVE PARA ACCIÓN #3
-          estado: 'FECHA_VENCIMIENTO',
-          finalizar: true,
-        });
-      }
+  if (!fechaVencimiento) {
+    return res.json({
+      ...baseCliente,
+      fecha_vencimiento: '📄 No tienes una fecha de vencimiento registrada actualmente.',
+      estado: 'SIN_FECHA_VENCIMIENTO',
+      finalizar: true,
+    });
+  }
+
+  return res.json({
+    ...baseCliente,
+    fecha_vencimiento: `📅 Tu fecha de vencimiento es ${fechaVencimiento}`,
+    estado: 'FECHA_VENCIMIENTO',
+    finalizar: true,
+  });
+}
+
 
       return res.json({
         ...baseCliente,
