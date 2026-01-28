@@ -61,7 +61,9 @@ export const webhookManychat = async (req: Request, res: Response) => {
     console.log('[MENSAJE]', mensaje_usuario);
 
     // 🔎 Clasificación REAL
-    const tipoDetectado = clasificarProblema(mensaje_usuario);
+    const tipoDetectado =
+    req.body.tipo_problema || clasificarProblema(mensaje_usuario);
+
     console.log('[TIPO DETECTADO]', tipoDetectado);
 
     // 1️⃣ Validar cédula
