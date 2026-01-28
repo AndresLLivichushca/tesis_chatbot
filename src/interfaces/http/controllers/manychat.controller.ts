@@ -22,7 +22,21 @@ function clasificarProblema(texto: string): TipoProblema {
     t.includes('no funciona')
   ) return 'INTERNET';
 
+  if (
+    t.includes('fecha') ||
+    t.includes('vencimiento')
+  ) return 'SALDO';
+
   return 'OTRO';
+}
+
+function obtenerFechaVencimiento(contratos: any[]): string | null {
+  for (const contrato of contratos) {
+    if (Array.isArray(contrato.facturas) && contrato.facturas.length > 0) {
+      return contrato.facturas[0].fechaemision;
+    }
+  }
+  return null;
 }
 
 export const webhookManychat = async (req: Request, res: Response) => {
@@ -77,14 +91,14 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // 🧱 BASE PARA CLIENTE VÁLIDO (CLAVE)
+    // 🧱 BASE CLIENTE
     const baseCliente = {
       cliente_existe: true,
       nombre_cliente: cliente.nombre,
       intentos_soporte: intentos,
     };
 
-    // 3️⃣ Detectar tipo de problema
+    // 3️⃣ Detectar tipo problema
     const esPlaceholder =
       typeof tipo_problema === 'string' && tipo_problema.includes('{{');
 
@@ -93,8 +107,30 @@ export const webhookManychat = async (req: Request, res: Response) => {
         ? tipo_problema
         : clasificarProblema(mensaje);
 
-    // 💰 SALDO
+    // 💰 SALDO / FECHA
     if (tipoDetectado === 'SALDO') {
+      const fechaVencimiento = obtenerFechaVencimiento(cliente.contratos || []);
+
+      if (mensaje.toLowerCase().includes('fecha')) {
+        if (!fechaVencimiento) {
+          return res.json({
+            ...baseCliente,
+            respuesta_ia_ips:
+              '📄 Actualmente no se registra una fecha de vencimiento activa.\n\n' +
+              'Esto puede deberse a que no tienes facturas pendientes.',
+            estado: 'SIN_FECHA_VENCIMIENTO',
+            finalizar: true,
+          });
+        }
+
+        return res.json({
+          ...baseCliente,
+          fecha_vencimiento: fechaVencimiento, // 👈 CLAVE PARA ACCIÓN #3
+          estado: 'FECHA_VENCIMIENTO',
+          finalizar: true,
+        });
+      }
+
       return res.json({
         ...baseCliente,
         respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es de $${cliente.saldo}.`,
@@ -106,7 +142,6 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
     // 🌐 INTERNET
     if (tipoDetectado === 'INTERNET') {
-
       if (intentos === 0) {
         return res.json({
           ...baseCliente,
