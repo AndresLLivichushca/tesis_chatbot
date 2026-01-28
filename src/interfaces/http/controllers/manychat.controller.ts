@@ -45,17 +45,32 @@ export const webhookManychat = async (req: Request, res: Response) => {
     const mensaje = mensaje_usuario || problema_cliente || '';
     const intentos = Number(intentos_soporte) || 0;
 
-    // 1️⃣ Sin mensaje
-    if (!mensaje && !resultado_paso) {
+    // 1️⃣ Pedir cédula si no existe
+    if (!cedula) {
       return res.json({
-        respuesta_ia_ips: 'Cuéntame si deseas consultar tu saldo o tienes problemas con el internet.',
-        estado: 'PEDIR_PROBLEMA',
+        respuesta_ia_ips: 'Por favor envíame tu número de cédula.',
+        estado: 'PEDIR_CEDULA',
         finalizar: false,
-        tipo_problema: 'OTRO',
       });
     }
 
-    // 2️⃣ Detectar tipo problema
+    // 2️⃣ Validar cliente (BLOQUE AUTORITARIO)
+    const cliente = await buscarClientePorCedula(cedula);
+    console.log('[CLIENTE]', cliente);
+
+    if (!cliente) {
+      return res.json({
+        respuesta_ia_ips:
+          '❌ Cliente no registrado.\n\n' +
+          'No encontramos información asociada a esta cédula. ' +
+          'Por favor revisa tu contrato o acércate a uno de nuestros centros de atención al cliente.',
+        estado: 'CLIENTE_NO_REGISTRADO',
+        cliente_existe: false,
+        finalizar: true,
+      });
+    }
+
+    // 3️⃣ Detectar tipo de problema (SOLO SI EL CLIENTE EXISTE)
     const esPlaceholderManychat =
       typeof tipo_problema === 'string' && tipo_problema.includes('{{');
 
@@ -69,46 +84,19 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
     console.log('[TIPO DETECTADO]', tipoDetectado);
 
-    // 3️⃣ Validar cédula
-    if (!cedula) {
-      return res.json({
-        respuesta_ia_ips: 'Por favor envíame tu número de cédula.',
-        estado: 'PEDIR_CEDULA',
-        finalizar: false,
-        tipo_problema: 'OTRO',
-      });
-    }
-
-    const cliente = await buscarClientePorCedula(cedula);
-    console.log('[CLIENTE]', cliente);
-
-    if (!cliente) {
-  return res.json({
-    respuesta_ia_ips:
-      '❌ Cliente no registrado.\n\nNo encontramos información asociada a esta cédula. ' +
-      'Por favor revisa tu contrato o acércate a uno de nuestros centros de atención al cliente.',
-    estado: 'CLIENTE_NO_REGISTRADO',
-    cliente_existe: false,
-    finalizar: true, // 🔴 CLAVE
-    tipo_problema: 'OTRO',
-  });
-}
-
-
-    // 💰 FLUJO SALDO (YA FUNCIONA)
+    // 💰 SALDO
     if (tipoDetectado === 'SALDO') {
       return res.json({
         respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es de $${cliente.saldo}.`,
         estado: 'RESPUESTA_SALDO',
-        finalizar: false,
+        finalizar: true,
         tipo_problema: 'SALDO',
       });
     }
 
-    // 🌐 FLUJO INTERNET (MENSAJES ESTÁTICOS)
+    // 🌐 INTERNET
     if (tipoDetectado === 'INTERNET') {
 
-      // Paso 1
       if (intentos === 0) {
         return res.json({
           respuesta_ia_ips:
@@ -120,11 +108,10 @@ export const webhookManychat = async (req: Request, res: Response) => {
         });
       }
 
-      // Paso 2
       if (resultado_paso === 'NO' && intentos === 1) {
         return res.json({
           respuesta_ia_ips:
-            '📶 Verifica que las luces del router estén encendidas correctamente.\n\n¿Tu internet ya funciona?',
+            '📶 Verifica que las luces del router estén encendidas correctamente.',
           estado: 'PASO_2',
           finalizar: false,
           tipo_problema: 'INTERNET',
@@ -132,7 +119,6 @@ export const webhookManychat = async (req: Request, res: Response) => {
         });
       }
 
-      // Resuelto
       if (resultado_paso === 'SI') {
         return res.json({
           respuesta_ia_ips: '✅ ¡Excelente! Me alegra saber que tu internet ya funciona.',
@@ -142,7 +128,6 @@ export const webhookManychat = async (req: Request, res: Response) => {
         });
       }
 
-      // Escalar
       return res.json({
         respuesta_ia_ips:
           '❗ No se pudo resolver automáticamente. Un agente de soporte se comunicará contigo.',
@@ -158,7 +143,6 @@ export const webhookManychat = async (req: Request, res: Response) => {
         'Puedo ayudarte con consultar tu saldo o con problemas de internet. ¿Qué deseas hacer?',
       estado: 'NO_ENTENDIDO',
       finalizar: false,
-      tipo_problema: 'OTRO',
     });
 
   } catch (error) {
@@ -167,7 +151,6 @@ export const webhookManychat = async (req: Request, res: Response) => {
       respuesta_ia_ips: 'Ocurrió un error. Te derivaré con un agente.',
       estado: 'ERROR',
       finalizar: true,
-      tipo_problema: 'OTRO',
     });
   }
 };
