@@ -13,7 +13,7 @@ export interface IARequestData {
 }
 
 export interface IAResponseData {
-  mensajeIA: string;
+  respuesta_ia_ips: string;
   estado: 'SEGUIR' | 'ESCALAR';
   finalizar: boolean;
 }
@@ -49,7 +49,7 @@ export class AIService {
       const parsed = JSON.parse(raw.substring(jsonStart, jsonEnd + 1));
 
       return {
-        mensajeIA: parsed.mensajeIA ?? 'Estoy revisando tu problema.',
+        respuesta_ia_ips: parsed.respuesta_ia_ips ?? 'Estoy revisando tu problema.',
         estado: parsed.estado === 'ESCALAR' ? 'ESCALAR' : 'SEGUIR',
         finalizar: Boolean(parsed.finalizar),
       };
@@ -57,7 +57,7 @@ export class AIService {
       console.error('[AI INTERNET ERROR]', error);
 
       return {
-        mensajeIA:
+        respuesta_ia_ips:
           'No pude resolver el problema automáticamente. Te derivaré con un agente técnico.',
         estado: 'ESCALAR',
         finalizar: true,

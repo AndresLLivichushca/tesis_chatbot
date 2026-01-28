@@ -23,7 +23,7 @@ REGLAS ESTRICTAS:
 
 FORMATO DE RESPUESTA (JSON):
 {
-  "mensajeIA": "texto para el cliente",
+  "respuesta_ia_ips": "texto para el cliente",
   "estado": "SEGUIR | ESCALAR",
   "finalizar": boolean
 }

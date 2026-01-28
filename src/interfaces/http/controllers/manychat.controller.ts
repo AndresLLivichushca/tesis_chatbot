@@ -51,7 +51,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
     if (!mensaje_usuario) {
       return res.json({
-        mensajeIA: 'No recibí tu mensaje, ¿puedes repetirlo?',
+        respuesta_ia_ips: 'No recibí tu mensaje, ¿puedes repetirlo?',
         estado: 'SEGUIR',
         finalizar: false,
         paso_diagnostico: 0,
@@ -77,7 +77,7 @@ if (req.body.tipo_problema && req.body.tipo_problema !== 'OTRO') {
     // 1️⃣ Validar cédula
     if (!cedula) {
       return res.json({
-        mensajeIA: 'Por favor envíame tu número de cédula para continuar.',
+        respuesta_ia_ips: 'Por favor envíame tu número de cédula para continuar.',
         estado: 'PEDIR_CEDULA',
         finalizar: false,
         paso_diagnostico: 0,
@@ -91,7 +91,7 @@ if (req.body.tipo_problema && req.body.tipo_problema !== 'OTRO') {
 
     if (!cliente) {
       return res.json({
-        mensajeIA:
+        respuesta_ia_ips:
           '❌ No encontré información asociada a esa cédula. Verifícala e inténtalo nuevamente.',
         estado: 'CEDULA_NO_ENCONTRADA',
         finalizar: false,
@@ -105,7 +105,7 @@ if (req.body.tipo_problema && req.body.tipo_problema !== 'OTRO') {
     // ==========================
     if (tipoDetectado === 'SALDO') {
       return res.json({
-        mensajeIA: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
+        respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
         nombre: cliente.nombre,
         estado: 'RESPUESTA_SALDO',
         finalizar: false, // 👈 IMPORTANTE (ManyChat sigue)
@@ -125,7 +125,7 @@ if (req.body.tipo_problema && req.body.tipo_problema !== 'OTRO') {
         });
 
         return res.json({
-          mensajeIA: iaResponse.mensajeIA,
+          respuesta_ia_ips: iaResponse.respuesta_ia_ips,
           estado: iaResponse.estado,        // SEGUIR | ESCALAR
           finalizar: iaResponse.finalizar,  // true | false
           tipo_problema: 'INTERNET',
@@ -137,7 +137,7 @@ if (req.body.tipo_problema && req.body.tipo_problema !== 'OTRO') {
     // ❓ FALLBACK
     // ==========================
     return res.json({
-      mensajeIA:
+      respuesta_ia_ips:
         'Puedo ayudarte con consultas de saldo, facturas o problemas de internet. ¿En qué te ayudo?',
       estado: 'NO_ENTENDIDO',
       finalizar: false,
@@ -149,7 +149,7 @@ if (req.body.tipo_problema && req.body.tipo_problema !== 'OTRO') {
     console.error('[ERROR WEBHOOK MANYCHAT]', error);
 
     return res.json({
-      mensajeIA:
+      respuesta_ia_ips:
         'Ocurrió un error inesperado. Te derivaré con un agente.',
       estado: 'ERROR',
       finalizar: true,
