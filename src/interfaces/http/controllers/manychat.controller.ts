@@ -32,11 +32,6 @@ function clasificarProblema(texto: string): 'SALDO' | 'INTERNET' | 'OTRO' {
 
 export const webhookManychat = async (req: Request, res: Response) => {
   try {
-    const secret = req.headers['x-webhook-secret'];
-    if (secret !== process.env.MANYCHAT_WEBHOOK_SECRET) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     const {
       cedula,
       mensaje_usuario,
@@ -44,27 +39,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
       tipo_problema,
     } = req.body;
 
-    const intentos = Number(intentos_soporte) || 0;
-
-    if (!mensaje_usuario) {
-      return res.json({
-        respuesta_ia_ips: 'No recibí tu mensaje, ¿puedes repetirlo?',
-        estado: 'SEGUIR',
-        finalizar: false,
-        tipo_problema: 'OTRO',
-      });
-    }
-
-    // 🔎 Clasificación persistente
-    let tipoDetectado: 'SALDO' | 'INTERNET' | 'OTRO';
-
-    if (tipo_problema && tipo_problema !== 'OTRO') {
-      tipoDetectado = tipo_problema;
-    } else {
-      tipoDetectado = clasificarProblema(mensaje_usuario);
-    }
-
-    // 1️⃣ Validar cédula
+    // 1️⃣ Pedir cédula
     if (!cedula) {
       return res.json({
         respuesta_ia_ips: 'Por favor envíame tu número de cédula para continuar.',
@@ -74,59 +49,70 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // 2️⃣ Buscar cliente
     const cliente = await buscarClientePorCedula(cedula);
 
     if (!cliente) {
       return res.json({
-        respuesta_ia_ips:
-          '❌ No encontré información asociada a esa cédula. Verifícala e inténtalo nuevamente.',
-        estado: 'CEDULA_NO_ENCONTRADA',
+        respuesta_ia_ips: 'No encontré información con esa cédula.',
+        estado: 'PEDIR_CEDULA',
         finalizar: false,
         tipo_problema: 'OTRO',
       });
     }
 
-    // 💰 SALDO (NO SE TOCA)
+    if (!mensaje_usuario) {
+      return res.json({
+        respuesta_ia_ips: 'No recibí tu mensaje, ¿puedes repetirlo?',
+        estado: 'SEGUIR',
+        finalizar: false,
+        tipo_problema: tipo_problema ?? 'OTRO',
+      });
+    }
+
+    // 🔒 Congelar intención
+    const tipoDetectado =
+      tipo_problema && tipo_problema !== 'OTRO'
+        ? tipo_problema
+        : clasificarProblema(mensaje_usuario);
+
+    // 💰 SALDO
     if (tipoDetectado === 'SALDO') {
       return res.json({
-        respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
-        estado: 'RESPUESTA_SALDO',
-        finalizar: false,
+        respuesta_ia_ips: `👋 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
+        estado: 'SALDO',
+        finalizar: true,
         tipo_problema: 'SALDO',
       });
     }
 
-    // 🌐 INTERNET (NUEVA LÓGICA CORRECTA)
+    // 🌐 INTERNET
     if (tipoDetectado === 'INTERNET') {
-      const iaResponse = await AIService.procesarMensaje({
+      const ia = await AIService.procesarMensaje({
         mensaje_usuario,
-        intentos_soporte: intentos,
+        intentos_soporte: Number(intentos_soporte),
       });
 
       return res.json({
-        respuesta_ia_ips: iaResponse.respuesta_ia_ips,
-        estado: iaResponse.estado,      // SEGUIR | ESCALAR
-        finalizar: iaResponse.finalizar,
+        respuesta_ia_ips: ia.respuesta_ia_ips,
+        estado: ia.estado,
+        finalizar: ia.finalizar,
         tipo_problema: 'INTERNET',
       });
     }
 
-    // ❓ FALLBACK
+    // ❓ Fallback
     return res.json({
       respuesta_ia_ips:
-        'Puedo ayudarte con consultas de saldo o problemas de internet. ¿Qué deseas hacer?',
-      estado: 'NO_ENTENDIDO',
+        'Puedo ayudarte con saldo o problemas de internet. ¿Qué deseas consultar?',
+      estado: 'SEGUIR',
       finalizar: false,
       tipo_problema: 'OTRO',
     });
   } catch (error) {
-    console.error('[ERROR WEBHOOK MANYCHAT]', error);
-
+    console.error('[WEBHOOK ERROR]', error);
     return res.json({
-      respuesta_ia_ips:
-        'Ocurrió un error inesperado. Te derivaré con un agente.',
-      estado: 'ERROR',
+      respuesta_ia_ips: 'Ocurrió un error inesperado.',
+      estado: 'ESCALAR',
       finalizar: true,
       tipo_problema: 'OTRO',
     });

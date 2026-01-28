@@ -1,5 +1,3 @@
-// src/core/ai/ai.prompt.ts
-
 export function buildInternetPrompt({
   mensaje_usuario,
   intentos_soporte,
@@ -17,23 +15,23 @@ REGLAS ESTRICTAS:
 - Da SOLO UNA instrucción concreta por mensaje
 - No repitas instrucciones anteriores
 - Sé claro, breve y técnico
-- Si ya hubo 3 intentos fallidos, indica que se debe escalar a un agente humano
+- Máximo 3 intentos
 - Devuelve ÚNICAMENTE JSON válido
 - Nunca escribas texto fuera del JSON
 
-FORMATO DE RESPUESTA (JSON):
+FORMATO:
 {
-  "respuesta_ia_ips": "texto para el cliente",
+  "respuesta_ia_ips": "texto",
   "estado": "SEGUIR | ESCALAR",
   "finalizar": boolean
 }
-    `.trim(),
+`.trim(),
 
     user: `
 Mensaje del cliente:
 "${mensaje_usuario}"
 
-Número de intentos previos: ${intentos_soporte}
-    `.trim(),
+Intento actual: ${intentos_soporte}
+`.trim(),
   };
 }
