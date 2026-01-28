@@ -88,6 +88,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
       '❌ Cliente no registrado.\n\nNo encontramos información asociada a esta cédula. ' +
       'Por favor revisa tu contrato o acércate a uno de nuestros centros de atención al cliente.',
     estado: 'CLIENTE_NO_REGISTRADO',
+    cliente_existe: false,
     finalizar: true, // 🔴 CLAVE
     tipo_problema: 'OTRO',
   });
