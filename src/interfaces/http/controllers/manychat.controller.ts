@@ -2,9 +2,6 @@ import { Request, Response } from 'express';
 import { buscarClientePorCedula } from '../../../core/services/cliente.service';
 import { AIService } from '../../../core/ai/ai.service';
 
-/**
- * Clasificación del problema (BACKEND decide)
- */
 function clasificarProblema(texto: string): 'SALDO' | 'INTERNET' | 'OTRO' {
   const t = texto.toLowerCase();
 
@@ -13,9 +10,7 @@ function clasificarProblema(texto: string): 'SALDO' | 'INTERNET' | 'OTRO' {
     t.includes('factura') ||
     t.includes('deuda') ||
     t.includes('pagar')
-  ) {
-    return 'SALDO';
-  }
+  ) return 'SALDO';
 
   if (
     t.includes('internet') ||
@@ -23,44 +18,30 @@ function clasificarProblema(texto: string): 'SALDO' | 'INTERNET' | 'OTRO' {
     t.includes('no tengo') ||
     t.includes('sin servicio') ||
     t.includes('caido')
-  ) {
-    return 'INTERNET';
-  }
+  ) return 'INTERNET';
 
   return 'OTRO';
 }
 
 export const webhookManychat = async (req: Request, res: Response) => {
   try {
+    console.log('--- MANYCHAT WEBHOOK ---');
+    console.log('[BODY]', req.body);
+
+    const secret = req.headers['x-webhook-secret'];
+    if (secret !== process.env.MANYCHAT_WEBHOOK_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const {
       cedula,
       mensaje_usuario,
-      intentos_soporte = 0,
       tipo_problema,
+      intentos_soporte = 0,
     } = req.body;
 
-    // 1️⃣ Pedir cédula
-    if (!cedula) {
-      return res.json({
-        respuesta_ia_ips: 'Por favor envíame tu número de cédula para continuar.',
-        estado: 'PEDIR_CEDULA',
-        finalizar: false,
-        tipo_problema: 'OTRO',
-      });
-    }
-
-    const cliente = await buscarClientePorCedula(cedula);
-
-    if (!cliente) {
-      return res.json({
-        respuesta_ia_ips: 'No encontré información con esa cédula.',
-        estado: 'PEDIR_CEDULA',
-        finalizar: false,
-        tipo_problema: 'OTRO',
-      });
-    }
-
     if (!mensaje_usuario) {
+      console.warn('[WARN] mensaje_usuario vacío');
       return res.json({
         respuesta_ia_ips: 'No recibí tu mensaje, ¿puedes repetirlo?',
         estado: 'SEGUIR',
@@ -69,18 +50,40 @@ export const webhookManychat = async (req: Request, res: Response) => {
       });
     }
 
-    // 🔒 Congelar intención
-    const tipoDetectado =
+    let tipoDetectado =
       tipo_problema && tipo_problema !== 'OTRO'
         ? tipo_problema
         : clasificarProblema(mensaje_usuario);
 
-    // 💰 SALDO
+    console.log('[TIPO DETECTADO]', tipoDetectado);
+
+    if (!cedula) {
+      return res.json({
+        respuesta_ia_ips: 'Por favor envíame tu número de cédula.',
+        estado: 'PEDIR_CEDULA',
+        finalizar: false,
+        tipo_problema: 'OTRO',
+      });
+    }
+
+    const cliente = await buscarClientePorCedula(cedula);
+    console.log('[CLIENTE]', cliente);
+
+    if (!cliente) {
+      return res.json({
+        respuesta_ia_ips: '❌ Cédula no encontrada.',
+        estado: 'CEDULA_NO_ENCONTRADA',
+        finalizar: false,
+        tipo_problema: 'OTRO',
+      });
+    }
+
+    // 💰 SALDO (INTOCABLE)
     if (tipoDetectado === 'SALDO') {
       return res.json({
-        respuesta_ia_ips: `👋 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
-        estado: 'SALDO',
-        finalizar: true,
+        respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es $${cliente.saldo}.`,
+        estado: 'RESPUESTA_SALDO',
+        finalizar: false,
         tipo_problema: 'SALDO',
       });
     }
@@ -89,30 +92,28 @@ export const webhookManychat = async (req: Request, res: Response) => {
     if (tipoDetectado === 'INTERNET') {
       const ia = await AIService.procesarMensaje({
         mensaje_usuario,
-        intentos_soporte: Number(intentos_soporte),
+        intentos_soporte: Number(intentos_soporte) || 0,
       });
 
       return res.json({
-        respuesta_ia_ips: ia.respuesta_ia_ips,
-        estado: ia.estado,
-        finalizar: ia.finalizar,
+        ...ia,
         tipo_problema: 'INTERNET',
       });
     }
 
-    // ❓ Fallback
     return res.json({
       respuesta_ia_ips:
         'Puedo ayudarte con saldo o problemas de internet. ¿Qué deseas consultar?',
-      estado: 'SEGUIR',
+      estado: 'NO_ENTENDIDO',
       finalizar: false,
       tipo_problema: 'OTRO',
     });
   } catch (error) {
-    console.error('[WEBHOOK ERROR]', error);
+    console.error('[ERROR MANYCHAT]', error);
+
     return res.json({
-      respuesta_ia_ips: 'Ocurrió un error inesperado.',
-      estado: 'ESCALAR',
+      respuesta_ia_ips: 'Ocurrió un error. Te derivaré con un agente.',
+      estado: 'ERROR',
       finalizar: true,
       tipo_problema: 'OTRO',
     });

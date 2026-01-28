@@ -1,3 +1,5 @@
+// src/core/ai/ai.prompt.ts
+
 export function buildInternetPrompt({
   mensaje_usuario,
   intentos_soporte,
@@ -15,7 +17,7 @@ REGLAS ESTRICTAS:
 - Da SOLO UNA instrucción concreta por mensaje
 - No repitas instrucciones anteriores
 - Sé claro, breve y técnico
-- Máximo 3 intentos
+- Si ya hubo 3 intentos fallidos, indica que se debe escalar a un agente humano
 - Devuelve ÚNICAMENTE JSON válido
 - Nunca escribas texto fuera del JSON
 
@@ -31,7 +33,7 @@ FORMATO:
 Mensaje del cliente:
 "${mensaje_usuario}"
 
-Intento actual: ${intentos_soporte}
+Intentos previos: ${intentos_soporte}
 `.trim(),
   };
 }
