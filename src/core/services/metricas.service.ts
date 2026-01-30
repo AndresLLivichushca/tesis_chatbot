@@ -3,14 +3,16 @@ import { pool } from '../../config/database';
 export const guardarMetrica = async (
   endpoint: string,
   tiempoRespuestaMs: number,
-  exitoso: boolean
+  exitoso: boolean,
+  requestId: string
 ) => {
   await pool.query(
     `
-    INSERT INTO metricas_chatbot (endpoint, tiempo_respuesta_ms, exitoso)
-    VALUES ($1, $2, $3)
+    INSERT INTO metricas_chatbot 
+      (endpoint, tiempo_respuesta_ms, exitoso, request_id)
+    VALUES ($1, $2, $3, $4)
     `,
-    [endpoint, tiempoRespuestaMs, exitoso]
+    [endpoint, tiempoRespuestaMs, exitoso, requestId]
   );
 };
 

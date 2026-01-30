@@ -13,7 +13,12 @@ export const metricasMiddleware = (
     const exitoso = res.statusCode < 400;
 
     try {
-      await guardarMetrica(req.originalUrl, tiempo, exitoso);
+      await guardarMetrica(
+        req.originalUrl,
+        tiempo,
+        exitoso,
+        req.requestId || 'unknown'
+      );
     } catch (error) {
       console.error('Error guardando métrica', error);
     }
