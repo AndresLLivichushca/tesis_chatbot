@@ -1,13 +1,17 @@
 import { Request, Response } from 'express';
 import { buscarClientePorCedula } from '../../../core/services/cliente.service';
 
-type TipoProblema = 'SALDO' | 'INTERNET' | 'OTRO';
+type TipoProblema = 'SALDO' | 'INTERNET' | 'SERVICIO' | 'OTRO';
 
 function clasificarProblema(texto: string): TipoProblema {
   const t = texto.toLowerCase();
 
-  if (t.includes('saldo') || t.includes('factura') || t.includes('deuda') || t.includes('pagar'))
-    return 'SALDO';
+  if (
+    t.includes('saldo') ||
+    t.includes('factura') ||
+    t.includes('deuda') ||
+    t.includes('pagar')
+  ) return 'SALDO';
 
   if (
     t.includes('internet') ||
@@ -18,8 +22,24 @@ function clasificarProblema(texto: string): TipoProblema {
     t.includes('no funciona')
   ) return 'INTERNET';
 
+  if (
+    t.includes('servicio') ||
+    t.includes('servicios') ||
+    t.includes('planes') ||
+    t.includes('paquetes') ||
+    t.includes('camaras') ||
+    t.includes('cámaras') ||
+    t.includes('stream') ||
+    t.includes('streaming') ||
+    t.includes('plataforma') ||
+    t.includes('netflix') ||
+    t.includes('hbo') ||
+    t.includes('disney')
+  ) return 'SERVICIO';
+
   return 'OTRO';
 }
+
 
 type EmpresaContrato = 'SONET' | 'SOTICOM' | 'FINETIC' | 'SEINTTEL' | 'DESCONOCIDO';
 
@@ -134,6 +154,18 @@ export const webhookManychat = async (req: Request, res: Response) => {
           finalizar: false,
         });
       }
+
+      // 🧾 SERVICIOS
+        if (tipoDetectado === 'SERVICIO') {
+          return res.json({
+            ...baseCliente,
+            respuesta_ia_ips: '📦 Estos son los servicios disponibles actualmente.',
+            estado: 'SERVICIOS',
+            tipo_problema: 'SERVICIO',
+            finalizar: false,
+          });
+        }
+
 
       if (resultado_paso === 'SI') {
         return res.json({
