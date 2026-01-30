@@ -21,6 +21,24 @@ function clasificarProblema(texto: string): TipoProblema {
   return 'OTRO';
 }
 
+type EmpresaContrato = 'SONET' | 'SOTICOM' | 'FINETIC' | 'SEINTTEL' | 'DESCONOCIDO';
+
+function detectarEmpresaPorContrato(contratos: any[]): EmpresaContrato {
+  if (!Array.isArray(contratos) || contratos.length === 0) {
+    return 'DESCONOCIDO';
+  }
+
+  const numero = contratos[0]?.numerocontrato ?? '';
+
+  if (numero.startsWith('CCR')) return 'SONET';
+  if (numero.startsWith('SOTI')) return 'SOTICOM';
+  if (numero.startsWith('CHM')) return 'FINETIC';
+  if (numero.startsWith('KND')) return 'SEINTTEL';
+
+  return 'DESCONOCIDO';
+}
+
+
 function obtenerFechaVencimiento(cliente: any): string {
   for (const contrato of cliente.contratos || []) {
     if (contrato.facturas && contrato.facturas.length > 0) {
@@ -63,7 +81,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
     }
 
     const cliente = await buscarClientePorCedula(cedula);
-
+    
     if (!cliente) {
       return res.json({
         respuesta_ia_ips:
@@ -76,6 +94,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
         finalizar: true,
       });
     }
+    const empresa_contrato = detectarEmpresaPorContrato(cliente.contratos);
 
     const fechaVencimiento = obtenerFechaVencimiento(cliente);
 
@@ -83,6 +102,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
       cliente_existe: true,
       nombre_cliente: cliente.nombre,
       fecha_vencimiento: fechaVencimiento,
+      empresa_contrato,
       intentos_soporte: intentos,
     };
 
