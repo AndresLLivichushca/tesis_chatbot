@@ -21,11 +21,14 @@ function clasificarProblema(texto: string): TipoProblema {
 
   if (
     t.includes('servicio') ||
+    t.includes('servicios') ||
     t.includes('planes') ||
     t.includes('paquetes') ||
     t.includes('camaras') ||
     t.includes('cámaras') ||
     t.includes('stream') ||
+    t.includes('streaming') ||
+    t.includes('plataforma') ||
     t.includes('netflix') ||
     t.includes('hbo') ||
     t.includes('disney')
@@ -59,13 +62,11 @@ function obtenerFechaVencimiento(cliente: any): string {
 }
 
 export const webhookManychat = async (req: Request, res: Response) => {
-  const inicio = Date.now();
-  const requestId = req.requestId || 'unknown';
+  const inicio = Date.now(); // ⏱ inicio medición
 
   try {
     const secret = req.headers['x-webhook-secret'];
     if (secret !== process.env.MANYCHAT_WEBHOOK_SECRET) {
-      await guardarMetrica('manychat_webhook', Date.now() - inicio, false, requestId);
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -83,10 +84,14 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
     // 1️⃣ Pedir cédula
     if (!cedula) {
-      await guardarMetrica('manychat_webhook', Date.now() - inicio, false, requestId);
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
       return res.json({
         respuesta_ia_ips: 'Por favor envíame tu número de cédula.',
         estado: 'PEDIR_CEDULA',
+        cliente_existe: null,
+        nombre_cliente: null,
+        fecha_vencimiento: null,
+        intentos_soporte: 0,
         finalizar: false,
       });
     }
@@ -94,10 +99,15 @@ export const webhookManychat = async (req: Request, res: Response) => {
     const cliente = await buscarClientePorCedula(cedula);
 
     if (!cliente) {
-      await guardarMetrica('manychat_webhook', Date.now() - inicio, false, requestId);
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
       return res.json({
-        respuesta_ia_ips: '❌ Cliente no registrado.',
+        respuesta_ia_ips:
+          '❌ Cliente no registrado.\n\nNo encontramos información asociada a esta cédula.',
         estado: 'CLIENTE_NO_REGISTRADO',
+        cliente_existe: false,
+        nombre_cliente: null,
+        fecha_vencimiento: null,
+        intentos_soporte: 0,
         finalizar: true,
       });
     }
@@ -118,40 +128,74 @@ export const webhookManychat = async (req: Request, res: Response) => {
         ? tipo_problema
         : clasificarProblema(mensaje);
 
+    // 💰 SALDO
     if (tipoDetectado === 'SALDO') {
-      await guardarMetrica('manychat_webhook', Date.now() - inicio, true, requestId);
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
       return res.json({
         ...baseCliente,
-        respuesta_ia_ips: `💰 Tu saldo pendiente es $${cliente.saldo}.`,
+        respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es de $${cliente.saldo}.`,
         estado: 'RESPUESTA_SALDO',
+        tipo_problema: 'SALDO',
         finalizar: false,
       });
     }
 
+    // 🌐 INTERNET
     if (tipoDetectado === 'INTERNET') {
-      await guardarMetrica('manychat_webhook', Date.now() - inicio, true, requestId);
+      if (intentos === 0) {
+        await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
+        return res.json({
+          ...baseCliente,
+          respuesta_ia_ips: '🔌 Reinicia tu router desconectándolo por 30 segundos.',
+          estado: 'PASO_1',
+          tipo_problema: 'INTERNET',
+          intentos_soporte: 1,
+          finalizar: false,
+        });
+      }
+
+      if (resultado_paso === 'SI') {
+        await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
+        return res.json({
+          ...baseCliente,
+          respuesta_ia_ips: '✅ ¡Excelente! El servicio fue restablecido.',
+          estado: 'RESUELTO',
+          tipo_problema: 'INTERNET',
+          finalizar: true,
+        });
+      }
+    }
+
+    // 🧾 SERVICIOS
+    if (tipoDetectado === 'SERVICIO') {
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
       return res.json({
         ...baseCliente,
-        respuesta_ia_ips: '🔌 Reinicia tu router por 30 segundos.',
-        estado: 'SOPORTE_INTERNET',
+        respuesta_ia_ips: '📦 Estos son los servicios disponibles actualmente.',
+        estado: 'SERVICIOS',
+        tipo_problema: 'SERVICIO',
         finalizar: false,
       });
     }
 
-    await guardarMetrica('manychat_webhook', Date.now() - inicio, false, requestId);
+    await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
     return res.json({
       ...baseCliente,
-      respuesta_ia_ips: 'No entendí tu solicitud.',
+      respuesta_ia_ips: 'Puedo ayudarte con saldo o problemas de internet.',
       estado: 'NO_ENTENDIDO',
       finalizar: false,
     });
 
   } catch (error) {
     console.error(error);
-    await guardarMetrica('manychat_webhook', Date.now() - inicio, false, requestId);
+    await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
     return res.json({
-      respuesta_ia_ips: 'Ocurrió un error interno.',
+      respuesta_ia_ips: 'Ocurrió un error. Un agente te contactará.',
       estado: 'ERROR',
+      cliente_existe: true,
+      nombre_cliente: null,
+      fecha_vencimiento: null,
+      intentos_soporte: 0,
       finalizar: true,
     });
   }

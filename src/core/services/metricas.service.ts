@@ -4,16 +4,25 @@ export const guardarMetrica = async (
   endpoint: string,
   tiempoRespuestaMs: number,
   exitoso: boolean,
-  requestId: string
+  requestId?: string
 ) => {
-  await pool.query(
-    `
-    INSERT INTO metricas_chatbot 
-      (endpoint, tiempo_respuesta_ms, exitoso, request_id)
-    VALUES ($1, $2, $3, $4)
-    `,
-    [endpoint, tiempoRespuestaMs, exitoso, requestId]
-  );
+  try {
+    await pool.query(
+      `
+      INSERT INTO metricas_chatbot (
+        endpoint,
+        tiempo_respuesta_ms,
+        exitoso,
+        request_id
+      )
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (request_id) DO NOTHING
+      `,
+      [endpoint, tiempoRespuestaMs, exitoso, requestId ?? null]
+    );
+  } catch (error) {
+    console.error('Error guardando métrica:', error);
+  }
 };
 
 export const obtenerMetricas = async () => {
