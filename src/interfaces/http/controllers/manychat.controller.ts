@@ -155,17 +155,6 @@ export const webhookManychat = async (req: Request, res: Response) => {
         });
       }
 
-      // 🧾 SERVICIOS
-        if (tipoDetectado === 'SERVICIO') {
-          return res.json({
-            ...baseCliente,
-            respuesta_ia_ips: '📦 Estos son los servicios disponibles actualmente.',
-            estado: 'SERVICIOS',
-            tipo_problema: 'SERVICIO',
-            finalizar: false,
-          });
-        }
-
 
       if (resultado_paso === 'SI') {
         return res.json({
@@ -177,6 +166,18 @@ export const webhookManychat = async (req: Request, res: Response) => {
         });
       }
     }
+
+     // 🧾 SERVICIOS
+        if (tipoDetectado === 'SERVICIO') {
+          return res.json({
+            ...baseCliente,
+            respuesta_ia_ips: '📦 Estos son los servicios disponibles actualmente.',
+            estado: 'SERVICIOS',
+            tipo_problema: 'SERVICIO',
+            finalizar: false,
+          });
+        }
+
 
     return res.json({
       ...baseCliente,
