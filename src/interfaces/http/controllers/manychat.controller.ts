@@ -1,17 +1,14 @@
 import { Request, Response } from 'express';
 import { buscarClientePorCedula } from '../../../core/services/cliente.service';
+import { guardarMetrica } from '../../../core/services/metricas.service';
 
 type TipoProblema = 'SALDO' | 'INTERNET' | 'SERVICIO' | 'OTRO';
 
 function clasificarProblema(texto: string): TipoProblema {
   const t = texto.toLowerCase();
 
-  if (
-    t.includes('saldo') ||
-    t.includes('factura') ||
-    t.includes('deuda') ||
-    t.includes('pagar')
-  ) return 'SALDO';
+  if (t.includes('saldo') || t.includes('factura') || t.includes('deuda') || t.includes('pagar'))
+    return 'SALDO';
 
   if (
     t.includes('internet') ||
@@ -40,13 +37,10 @@ function clasificarProblema(texto: string): TipoProblema {
   return 'OTRO';
 }
 
-
 type EmpresaContrato = 'SONET' | 'SOTICOM' | 'FINETIC' | 'SEINTTEL' | 'DESCONOCIDO';
 
 function detectarEmpresaPorContrato(contratos: any[]): EmpresaContrato {
-  if (!Array.isArray(contratos) || contratos.length === 0) {
-    return 'DESCONOCIDO';
-  }
+  if (!Array.isArray(contratos) || contratos.length === 0) return 'DESCONOCIDO';
 
   const numero = contratos[0]?.numerocontrato ?? '';
 
@@ -58,7 +52,6 @@ function detectarEmpresaPorContrato(contratos: any[]): EmpresaContrato {
   return 'DESCONOCIDO';
 }
 
-
 function obtenerFechaVencimiento(cliente: any): string {
   for (const contrato of cliente.contratos || []) {
     if (contrato.facturas && contrato.facturas.length > 0) {
@@ -69,6 +62,8 @@ function obtenerFechaVencimiento(cliente: any): string {
 }
 
 export const webhookManychat = async (req: Request, res: Response) => {
+  const inicio = Date.now(); // ⏱ inicio medición
+
   try {
     const secret = req.headers['x-webhook-secret'];
     if (secret !== process.env.MANYCHAT_WEBHOOK_SECRET) {
@@ -89,6 +84,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
     // 1️⃣ Pedir cédula
     if (!cedula) {
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
       return res.json({
         respuesta_ia_ips: 'Por favor envíame tu número de cédula.',
         estado: 'PEDIR_CEDULA',
@@ -101,8 +97,9 @@ export const webhookManychat = async (req: Request, res: Response) => {
     }
 
     const cliente = await buscarClientePorCedula(cedula);
-    
+
     if (!cliente) {
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
       return res.json({
         respuesta_ia_ips:
           '❌ Cliente no registrado.\n\nNo encontramos información asociada a esta cédula.',
@@ -114,8 +111,8 @@ export const webhookManychat = async (req: Request, res: Response) => {
         finalizar: true,
       });
     }
-    const empresa_contrato = detectarEmpresaPorContrato(cliente.contratos);
 
+    const empresa_contrato = detectarEmpresaPorContrato(cliente.contratos);
     const fechaVencimiento = obtenerFechaVencimiento(cliente);
 
     const baseCliente = {
@@ -133,6 +130,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
     // 💰 SALDO
     if (tipoDetectado === 'SALDO') {
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
       return res.json({
         ...baseCliente,
         respuesta_ia_ips: `👨‍💻 Hola ${cliente.nombre}, tu saldo pendiente es de $${cliente.saldo}.`,
@@ -145,6 +143,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
     // 🌐 INTERNET
     if (tipoDetectado === 'INTERNET') {
       if (intentos === 0) {
+        await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
         return res.json({
           ...baseCliente,
           respuesta_ia_ips: '🔌 Reinicia tu router desconectándolo por 30 segundos.',
@@ -155,8 +154,8 @@ export const webhookManychat = async (req: Request, res: Response) => {
         });
       }
 
-
       if (resultado_paso === 'SI') {
+        await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
         return res.json({
           ...baseCliente,
           respuesta_ia_ips: '✅ ¡Excelente! El servicio fue restablecido.',
@@ -167,18 +166,19 @@ export const webhookManychat = async (req: Request, res: Response) => {
       }
     }
 
-     // 🧾 SERVICIOS
-        if (tipoDetectado === 'SERVICIO') {
-          return res.json({
-            ...baseCliente,
-            respuesta_ia_ips: '📦 Estos son los servicios disponibles actualmente.',
-            estado: 'SERVICIOS',
-            tipo_problema: 'SERVICIO',
-            finalizar: false,
-          });
-        }
+    // 🧾 SERVICIOS
+    if (tipoDetectado === 'SERVICIO') {
+      await guardarMetrica('manychat_webhook', Date.now() - inicio, true);
+      return res.json({
+        ...baseCliente,
+        respuesta_ia_ips: '📦 Estos son los servicios disponibles actualmente.',
+        estado: 'SERVICIOS',
+        tipo_problema: 'SERVICIO',
+        finalizar: false,
+      });
+    }
 
-
+    await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
     return res.json({
       ...baseCliente,
       respuesta_ia_ips: 'Puedo ayudarte con saldo o problemas de internet.',
@@ -188,6 +188,7 @@ export const webhookManychat = async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error(error);
+    await guardarMetrica('manychat_webhook', Date.now() - inicio, false);
     return res.json({
       respuesta_ia_ips: 'Ocurrió un error. Un agente te contactará.',
       estado: 'ERROR',
